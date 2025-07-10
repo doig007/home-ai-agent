@@ -25,7 +25,7 @@ from .const import (
     HISTORY_PERIOD_TIMEDELTA_MAP,
 )
 from .gemini_client import GeminiClient 
-from homeassistant.components.history import get_significant_states # Direct import
+from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
 _LOGGER = logging.getLogger(__name__)
