@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     CONF_API_KEY,  # Added import
 )
+
 from .gemini_client import GeminiClient
 
 _LOGGER = logging.getLogger(__name__)
