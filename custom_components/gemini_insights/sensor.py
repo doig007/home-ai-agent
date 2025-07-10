@@ -11,7 +11,16 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import DOMAIN, CONF_ENTITIES, CONF_PROMPT, CONF_UPDATE_INTERVAL, DEFAULT_PROMPT, DEFAULT_UPDATE_INTERVAL
+from .const import (
+    DOMAIN,
+    CONF_ENTITIES,
+    CONF_PROMPT,
+    CONF_UPDATE_INTERVAL,
+    DEFAULT_PROMPT,
+    DEFAULT_UPDATE_INTERVAL,
+    CONF_API_KEY,  # Added import
+)
+
 from .gemini_client import GeminiClient
 
 _LOGGER = logging.getLogger(__name__)
