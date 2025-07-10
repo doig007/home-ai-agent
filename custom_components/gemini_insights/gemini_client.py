@@ -48,13 +48,15 @@ class GeminiClient:
 
         Args:
             prompt: The base prompt template.
-            entity_data_json: A JSON string Mitarbeitering the Home Assistant entity data.
+            entity_data_json: A JSON string of the Home Assistant entity data.
 
         Returns:
             A dictionary containing the parsed insights, alerts, and summary,
             or None if an error occurs.
         """
         full_prompt = prompt.format(entity_data=entity_data_json)
+        _LOGGER.info(f"Full prompt for Gemini API: {full_prompt}")
+        _LOGGER.info(f"Entity data for Gemini API: {entity_data_json}")
         _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...") # Log truncated prompt
 
         try:
