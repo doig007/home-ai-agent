@@ -31,10 +31,13 @@ HISTORY_PERIOD_TIMEDELTA_MAP = {
 
 
 DEFAULT_PROMPT = """
-Analyze the following Home Assistant data and provide:
-1. General insights based on useful observed trends.
-2. Alerts if anything looks out of the ordinary.
-3. A summary of the data for the specified entities.
+The following are Home Assistant data from specific entities within a family home. Analyse the trends and correlated events to provide:
+1. Insights based on useful observed trends.  These should not be generic and should be specific to the latest day.
+2. Alerts if anything looks unusual.
+3. Recommended actions  to take.
+
+Respond in an extremely concise way, suitable for a phone notification. Ignore any 'unknown' data points or data issues and don't comment on them.  Leave an element blank if no response of high value.
+
 Data:
 {entity_data}
 """
