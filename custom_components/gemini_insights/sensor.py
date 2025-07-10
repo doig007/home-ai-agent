@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     CONF_API_KEY,  # Added import
 )
+
 from .gemini_client import GeminiClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,6 +140,7 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the state of the sensor."""
+
         if self.coordinator.data is None:
             # This can happen before the first successful update or if an update fails and returns None
             _LOGGER.debug(f"Coordinator data is None for {self.name}, returning Initializing...")
