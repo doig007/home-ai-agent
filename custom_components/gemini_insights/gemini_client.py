@@ -22,7 +22,7 @@ DEFAULT_GENERATION_CONFIG = {
     "temperature": 0.7,
     "top_p": 1,
     "top_k": 1,
-    "max_output_tokens": 2048, # Adjust as needed, up to model limits
+    "max_output_tokens": 64000, # Adjust as needed, up to model limits
 }
 
 
