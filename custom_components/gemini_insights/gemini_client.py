@@ -35,11 +35,11 @@ class GeminiClient:
             raise ValueError("Gemini API key is required.")
         genai.configure(api_key=api_key)
         self._model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash", # Using flash for speed and cost
+            model_name="gemini-1.5-flash", # Using flash for speed and cost
             generation_config=DEFAULT_GENERATION_CONFIG,
             safety_settings=DEFAULT_SAFETY_SETTINGS
         )
-        _LOGGER.info("Gemini Client initialized with model gemini-2.5-flash")
+        _LOGGER.info("Gemini Client initialized with model gemini-1.5-flash")
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
 
@@ -99,8 +99,8 @@ class GeminiClient:
                 insights_data[key] = insights_data[key].strip()
 
             if not insights_data["insights"] and not insights_data["alerts"] and not insights_data["summary"]:
-                 _LOGGER.warning("Gemini response was empty or not parsable by simple splitting. Raw text: %s", response.text)
-                 # Fallback to using the full text if parsing fails
+                _LOGGER.warning("Gemini response was empty or not parsable by simple splitting. Raw text: %s", response.text)
+                # Fallback to using the full text if parsing fails
                 return {"insights": response.text, "alerts": "Could not parse.", "summary": "Could not parse.", "raw_text": response.text}
 
             # Include raw_text in the successful response
