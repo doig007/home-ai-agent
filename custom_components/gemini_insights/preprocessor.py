@@ -28,7 +28,7 @@ def preprocess_sensor_data(raw_data: str) -> str:
         if len(parts) != 3:
             # Skip malformed lines
             continue
-
+        
         entity_id, state, last_changed = parts
 
         if entity_id not in entity_id_to_short_code:
@@ -39,7 +39,7 @@ def preprocess_sensor_data(raw_data: str) -> str:
                 "full_id": entity_id,
                 "readings": []
             }
-
+        
         short_code = entity_id_to_short_code[entity_id]
         processed_data[short_code]["readings"].append([last_changed, state])
 
@@ -54,13 +54,13 @@ sensor.octopus_energy_electricity_21j0023364_1200037135231_current_demand	219	20
 sensor.another_sensor_id_foo_bar_baz	10	2025-07-08T23:00:05.000Z
 sensor.another_sensor_id_foo_bar_baz	12	2025-07-08T23:01:06.000Z
 """
-
+    
     print("Original data (first few lines for brevity):")
     print('\n'.join(sample_data.strip().split('\n')[:6]))
     print("\n" + "="*30 + "\n")
-
+    
     processed_json = preprocess_sensor_data(sample_data)
-
+    
     print("Processed JSON data:")
     print(processed_json)
 
@@ -78,7 +78,7 @@ sensor.another_sensor_id_foo_bar_baz	12	2025-07-08T23:01:06.000Z
     try:
         with open("sample_sensor_data.txt", "r") as f:
             full_sample_data = f.read()
-
+        
         processed_full_json = preprocess_sensor_data(full_sample_data)
         print("\nProcessed JSON data (full sample):")
         print(processed_full_json)
