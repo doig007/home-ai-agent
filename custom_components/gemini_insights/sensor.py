@@ -24,7 +24,8 @@ from .const import (
     HISTORY_LATEST_ONLY,
     HISTORY_PERIOD_TIMEDELTA_MAP,
 )
-from .gemini_client import GeminiClient 
+from .gemini_client import GeminiClient
+from .preprocessor import preprocess_sensor_data # Import data preprocessor
 from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
@@ -155,12 +156,49 @@ async def async_setup_entry(
                         entity_data_map[entity_id] = {"current_state": None}
                         _LOGGER.warning(f"Entity {entity_id} not found for current state.")
 
-        import json 
-        entity_data_json = json.dumps(entity_data_map, indent=2)
+        # Construct raw data string for preprocessing
+        raw_data_for_preprocessing_list = ["entity_id\tstate\tlast_changed"] # Header
+        _LOGGER.debug(f"Entity data map before preprocessing: {entity_data_map}")
+
+        for entity_id_key, entity_data_value in entity_data_map.items():
+            # Current state handling
+            if "current_state" in entity_data_value and entity_data_value["current_state"]:
+                state_info = entity_data_value["current_state"]
+                last_changed_iso = state_info.get("last_changed", dt_util.utcnow().isoformat())
+                raw_data_for_preprocessing_list.append(
+                    f"{entity_id_key}\t{state_info.get('state', 'unknown')}\t{last_changed_iso}"
+                )
+            
+            # Historical states handling
+            if "historical_states" in entity_data_value:
+                for hist_state in entity_data_value["historical_states"]:
+                    last_changed_iso = hist_state.get("last_changed", dt_util.utcnow().isoformat())
+                    raw_data_for_preprocessing_list.append(
+                        f"{entity_id_key}\t{hist_state.get('state', 'unknown')}\t{last_changed_iso}"
+                    )
+
+        entity_data_json = "{}" # Default to empty JSON
+        if len(raw_data_for_preprocessing_list) > 1: # More than just header
+            raw_data_string_for_gemini = "\n".join(raw_data_for_preprocessing_list)
+            original_data_len = len(raw_data_string_for_gemini)
+            _LOGGER.debug(f"Raw data for preprocessing (first 500 chars): {raw_data_string_for_gemini[:500]}")
+            _LOGGER.debug(f"Original data length for preprocessing: {original_data_len} characters.")
+
+            entity_data_json = preprocess_sensor_data(raw_data_string_for_gemini)
+            processed_data_len = len(entity_data_json)
+            _LOGGER.debug(f"Preprocessed data for Gemini (first 500 chars): {entity_data_json[:500]}")
+            _LOGGER.debug(f"Processed data length: {processed_data_len} characters.")
+            if original_data_len > 0:
+                reduction_percentage = ((original_data_len - processed_data_len) / original_data_len) * 100
+                _LOGGER.info(f"Preprocessing reduced data size by {reduction_percentage:.2f}% (from {original_data_len} to {processed_data_len} chars).")
+
+        else:
+            _LOGGER.info("No data to preprocess. Using empty JSON for Gemini.")
+       
         
         if len(entity_data_json) > 100000: # Arbitrary limit, Gemini has token limits
             _LOGGER.warning(
-                f"The data payload for Gemini is very large ({len(entity_data_json)} bytes). "
+                f"The data payload for Gemini is very large ({len(entity_data_json)} bytes) even after preprocessing. "
                 "This might lead to API errors, high costs, or truncated analysis. "
                 "Consider selecting fewer entities or a shorter history period."
             )
