@@ -1,0 +1,11 @@
+{
+  "domain": "gemini_insights",
+  "name": "Gemini Insights",
+  "documentation": "https://github.com/your_username/gemini-insights/blob/main/README.md",
+  "issue_tracker": "https://github.com/your_username/gemini-insights/issues",
+  "codeowners": ["@your_username"],
+  "version": "0.1.0",
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "requirements": ["google-generativeai>=0.3.0"]
+}
