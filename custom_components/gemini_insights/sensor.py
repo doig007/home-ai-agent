@@ -108,10 +108,26 @@ async def async_setup_entry(
                     start_time = now - timedelta(**timedelta_params)
                     _LOGGER.debug(f"Fetching history for {entity_id} from {start_time} to {now}")
 
-                    # get_significant_states returns a dict entity_id: [states]
-                    # We are calling it for one entity_id at a time.
+                    # Diagnostic logging for the history module
+                    _LOGGER.debug(f"Type of 'history' object in sensor.py: {type(history)}")
+                    # dir(history) can be very verbose, let's check for the specific attribute first
+                    # _LOGGER.debug(f"Attributes of 'history' object: {dir(history)}")
+
+                    get_significant_states_func = getattr(history, 'get_significant_states', None)
+
+                    if not callable(get_significant_states_func):
+                        _LOGGER.error(
+                            f"'get_significant_states' is not available or not callable in the 'history' module (type: {type(history)}). "
+                            "Please ensure the 'history' integration is enabled and working correctly. "
+                            f"Attributes found: {dir(history)[:500]}" # Log first 500 chars of dir output
+                        )
+                        # Skip fetching history for this entity, or return an error for the whole update
+                        entity_data_map[entity_id] = {"error": "History function not available"}
+                        continue # Move to the next entity_id
+
+
                     history_states_response = await hass.async_add_executor_job(
-                        history.get_significant_states,
+                        get_significant_states_func, # Use the fetched function object
                         hass,
                         start_time,
                         None, # end_time (None means up to 'now')
