@@ -1,0 +1,12 @@
+{
+    "name": "Gemini Insights,
+    "description": "A custom component for Home Assistant to gain insights via generative AI.",
+    "domain": "gemini_insights",
+    "codeowners": ["@doig007"],
+    "documentation": "https://github.com/doig007/HomeAssistant_AI/",
+    "issue_tracker": "https://github.com/doig007/HomeAssistant_AI/issues",
+    "requirements": [],
+    "version": "0.1.0",
+    "iot_class": "cloud_polling"
+  }
+  
