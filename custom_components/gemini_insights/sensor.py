@@ -18,17 +18,15 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
-
     CONF_API_KEY,
     CONF_HISTORY_PERIOD,
     DEFAULT_HISTORY_PERIOD,
     HISTORY_LATEST_ONLY,
     HISTORY_PERIOD_TIMEDELTA_MAP,
 )
-from .gemini_client import GeminiClient
-from homeassistant.components import history # For fetching history
+from .gemini_client import GeminiClient 
+from homeassistant.components.history import get_significant_states # Direct import
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +43,7 @@ async def async_setup_entry(
     config = domain_data["config"] # Initial setup data
     options = domain_data["options"] # Runtime options, takes precedence
 
-    api_key = config.get(CONF_API_KEY)
+    api_key = config.get(CONF_API_KEY) 
 
     if not api_key:
         _LOGGER.error("Gemini API key not found in configuration. Component will not be set up.")
@@ -70,20 +68,17 @@ async def async_setup_entry(
     async def async_update_data():
         """Fetch data from Home Assistant, send to Gemini, and return insights."""
         _LOGGER.debug("Coordinator update called")
-
+        
         # Prioritize options, then config, then empty list/default prompt
         entity_ids = options.get(CONF_ENTITIES, config.get(CONF_ENTITIES, []))
         prompt_template = options.get(CONF_PROMPT, config.get(CONF_PROMPT, DEFAULT_PROMPT))
-
         history_period_key = options.get(CONF_HISTORY_PERIOD, config.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD))
-
 
         if not entity_ids:
             _LOGGER.info("No entities configured for Gemini Insights. Skipping API call.")
             return {"insights": "No entities configured.", "alerts": "", "summary": ""}
 
         entity_data_map = {}
-
         now = dt_util.utcnow()
 
         for entity_id in entity_ids:
@@ -107,27 +102,9 @@ async def async_setup_entry(
                 if timedelta_params:
                     start_time = now - timedelta(**timedelta_params)
                     _LOGGER.debug(f"Fetching history for {entity_id} from {start_time} to {now}")
-
-                    # Diagnostic logging for the history module
-                    _LOGGER.debug(f"Type of 'history' object in sensor.py: {type(history)}")
-                    # dir(history) can be very verbose, let's check for the specific attribute first
-                    # _LOGGER.debug(f"Attributes of 'history' object: {dir(history)}")
-
-                    get_significant_states_func = getattr(history, 'get_significant_states', None)
-
-                    if not callable(get_significant_states_func):
-                        _LOGGER.error(
-                            f"'get_significant_states' is not available or not callable in the 'history' module (type: {type(history)}). "
-                            "Please ensure the 'history' integration is enabled and working correctly. "
-                            f"Attributes found: {dir(history)[:500]}" # Log first 500 chars of dir output
-                        )
-                        # Skip fetching history for this entity, or return an error for the whole update
-                        entity_data_map[entity_id] = {"error": "History function not available"}
-                        continue # Move to the next entity_id
-
-
+                    
                     history_states_response = await hass.async_add_executor_job(
-                        get_significant_states_func, # Use the fetched function object
+                        get_significant_states, # Use directly imported function
                         hass,
                         start_time,
                         None, # end_time (None means up to 'now')
@@ -136,7 +113,7 @@ async def async_setup_entry(
                         True, # include_start_time_state
                         False # minimal_response -> we want full state objects
                     )
-
+                    
                     historical_states_data = []
                     if entity_id in history_states_response and history_states_response[entity_id]:
                         for s in history_states_response[entity_id]:
@@ -149,7 +126,7 @@ async def async_setup_entry(
                         _LOGGER.debug(f"Found {len(historical_states_data)} historical states for {entity_id}")
                     else:
                         _LOGGER.debug(f"No significant historical states found for {entity_id} in the period.")
-
+                    
                     entity_data_map[entity_id] = {"historical_states": historical_states_data}
                     if not historical_states_data: # Also add current state if no history found to have some data
                         current_state_val = hass.states.get(entity_id)
@@ -178,9 +155,9 @@ async def async_setup_entry(
                         entity_data_map[entity_id] = {"current_state": None}
                         _LOGGER.warning(f"Entity {entity_id} not found for current state.")
 
-        import json
+        import json 
         entity_data_json = json.dumps(entity_data_map, indent=2)
-
+        
         if len(entity_data_json) > 100000: # Arbitrary limit, Gemini has token limits
             _LOGGER.warning(
                 f"The data payload for Gemini is very large ({len(entity_data_json)} bytes). "
@@ -190,7 +167,6 @@ async def async_setup_entry(
 
         try:
             # The GeminiClient's get_insights method is synchronous (def, not async def).
-
             # The DataUpdateCoordinator will run this in an executor thread.
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
@@ -240,12 +216,11 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-
         if self.coordinator.data is None:
             # This can happen before the first successful update or if an update fails and returns None
             _LOGGER.debug(f"Coordinator data is None for {self.name}, returning Initializing...")
-            return "Initializing..."
-
+            return "Initializing..." 
+        
         # Check if coordinator.data has a 'get' method (is dict-like)
         if hasattr(self.coordinator.data, 'get') and callable(self.coordinator.data.get):
             return self.coordinator.data.get(self._insight_type, "Not available")
@@ -254,24 +229,23 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
             _LOGGER.warning(
                 f"Coordinator data for sensor {self.name} is not a dictionary (type: {type(self.coordinator.data)}). "
                 f"This might indicate an issue with the DataUpdateCoordinator or the update_method. "
-                f"Current coordinator data (snippet): {str(self.coordinator.data)[:200]}"
+                f"Current coordinator data (snippet): {str(self.coordinator.data)[:200]}" 
             )
             return "Error: Invalid data" # Or some other error indicator for the sensor state
 
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-
         attrs = {}
         # Add raw_data if the last update was successful and data is available and is a dictionary
         if self.coordinator.last_update_success and \
            self.coordinator.data and \
            isinstance(self.coordinator.data, dict):
             attrs["raw_data"] = self.coordinator.data
-
+        
         # Add the status of the last update attempt
         attrs["last_update_status"] = "Success" if self.coordinator.last_update_success else "Failed"
-
+        
         # The entity's own 'last_updated' attribute will reflect when HA last wrote its state.
         # If a more specific timestamp from the data source is needed, it should be extracted
         # from self.coordinator.data if available.
