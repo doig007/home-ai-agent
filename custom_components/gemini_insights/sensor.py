@@ -140,9 +140,23 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if self.coordinator.data:
+
+        if self.coordinator.data is None:
+            # This can happen before the first successful update or if an update fails and returns None
+            _LOGGER.debug(f"Coordinator data is None for {self.name}, returning Initializing...")
+            return "Initializing..."
+
+        # Check if coordinator.data has a 'get' method (is dict-like)
+        if hasattr(self.coordinator.data, 'get') and callable(self.coordinator.data.get):
             return self.coordinator.data.get(self._insight_type, "Not available")
-        return "Initializing..."
+        else:
+            # This is the problematic case where data is not a dict (e.g., a coroutine or other unexpected type)
+            _LOGGER.warning(
+                f"Coordinator data for sensor {self.name} is not a dictionary (type: {type(self.coordinator.data)}). "
+                f"This might indicate an issue with the DataUpdateCoordinator or the update_method. "
+                f"Current coordinator data (snippet): {str(self.coordinator.data)[:200]}"
+            )
+            return "Error: Invalid data" # Or some other error indicator for the sensor state
 
     @property
     def extra_state_attributes(self):
