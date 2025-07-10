@@ -14,6 +14,16 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
+    CONF_HISTORY_PERIOD,
+    DEFAULT_HISTORY_PERIOD,
+    HISTORY_LATEST_ONLY,
+    HISTORY_1_HOUR,
+    HISTORY_6_HOURS,
+    HISTORY_12_HOURS,
+    HISTORY_24_HOURS,
+    HISTORY_3_DAYS,
+    HISTORY_7_DAYS,
+
 )
 
 # Import GeminiClient to test API key, but be careful with blocking calls
@@ -103,6 +113,20 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
         current_update_interval = self.config_entry.options.get(
             CONF_UPDATE_INTERVAL, self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
         )
+        current_history_period = self.config_entry.options.get(
+            CONF_HISTORY_PERIOD, self.config_entry.data.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD)
+        )
+
+        history_period_options = [
+            HISTORY_LATEST_ONLY,
+            HISTORY_1_HOUR,
+            HISTORY_6_HOURS,
+            HISTORY_12_HOURS,
+            HISTORY_24_HOURS,
+            HISTORY_3_DAYS,
+            HISTORY_7_DAYS,
+        ]
+
 
         options_schema = vol.Schema(
             {
@@ -119,6 +143,10 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_UPDATE_INTERVAL, default=current_update_interval
                 ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)), # 1 min to 1 day
+                vol.Required(
+                    CONF_HISTORY_PERIOD, default=current_history_period
+                ): vol.In(history_period_options),
+
             }
         )
 

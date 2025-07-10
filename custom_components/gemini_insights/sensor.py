@@ -18,10 +18,17 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
-    CONF_API_KEY,  # Added import
-)
 
+    CONF_API_KEY,
+    CONF_HISTORY_PERIOD,
+    DEFAULT_HISTORY_PERIOD,
+    HISTORY_LATEST_ONLY,
+    HISTORY_PERIOD_TIMEDELTA_MAP,
+)
 from .gemini_client import GeminiClient
+from homeassistant.components import history # For fetching history
+from homeassistant.util import dt as dt_util # For timezone aware datetime objects
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,29 +75,106 @@ async def async_setup_entry(
         entity_ids = options.get(CONF_ENTITIES, config.get(CONF_ENTITIES, []))
         prompt_template = options.get(CONF_PROMPT, config.get(CONF_PROMPT, DEFAULT_PROMPT))
 
+        history_period_key = options.get(CONF_HISTORY_PERIOD, config.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD))
+
+
         if not entity_ids:
             _LOGGER.info("No entities configured for Gemini Insights. Skipping API call.")
             return {"insights": "No entities configured.", "alerts": "", "summary": ""}
 
         entity_data_map = {}
-        for entity_id in entity_ids:
-            state = hass.states.get(entity_id)
-            if state:
-                entity_data_map[entity_id] = {
-                    "state": state.state,
-                    "attributes": dict(state.attributes),
-                    "last_changed": state.last_changed.isoformat() if state.last_changed else None,
-                    "last_updated": state.last_updated.isoformat() if state.last_updated else None,
-                }
-            else:
-                entity_data_map[entity_id] = None
-                _LOGGER.warning(f"Entity {entity_id} not found.")
 
-        import json # Make sure json is imported
+        now = dt_util.utcnow()
+
+        for entity_id in entity_ids:
+            if history_period_key == HISTORY_LATEST_ONLY:
+                state = hass.states.get(entity_id)
+                if state:
+                    entity_data_map[entity_id] = {
+                        "current_state": {
+                            "state": state.state,
+                            "attributes": dict(state.attributes),
+                            "last_changed": state.last_changed.isoformat() if state.last_changed else None,
+                            "last_updated": state.last_updated.isoformat() if state.last_updated else None,
+                        }
+                    }
+                else:
+                    entity_data_map[entity_id] = {"current_state": None}
+                    _LOGGER.warning(f"Entity {entity_id} not found for current state.")
+            else:
+                # Fetch historical data
+                timedelta_params = HISTORY_PERIOD_TIMEDELTA_MAP.get(history_period_key)
+                if timedelta_params:
+                    start_time = now - timedelta(**timedelta_params)
+                    _LOGGER.debug(f"Fetching history for {entity_id} from {start_time} to {now}")
+
+                    # get_significant_states returns a dict entity_id: [states]
+                    # We are calling it for one entity_id at a time.
+                    history_states_response = await hass.async_add_executor_job(
+                        history.get_significant_states,
+                        hass,
+                        start_time,
+                        None, # end_time (None means up to 'now')
+                        [entity_id],
+                        None, # filters
+                        True, # include_start_time_state
+                        False # minimal_response -> we want full state objects
+                    )
+
+                    historical_states_data = []
+                    if entity_id in history_states_response and history_states_response[entity_id]:
+                        for s in history_states_response[entity_id]:
+                            historical_states_data.append({
+                                "state": s.state,
+                                "attributes": dict(s.attributes),
+                                "last_changed": s.last_changed.isoformat() if s.last_changed else None,
+                                "last_updated": s.last_updated.isoformat() if s.last_updated else None,
+                            })
+                        _LOGGER.debug(f"Found {len(historical_states_data)} historical states for {entity_id}")
+                    else:
+                        _LOGGER.debug(f"No significant historical states found for {entity_id} in the period.")
+
+                    entity_data_map[entity_id] = {"historical_states": historical_states_data}
+                    if not historical_states_data: # Also add current state if no history found to have some data
+                        current_state_val = hass.states.get(entity_id)
+                        if current_state_val:
+                             entity_data_map[entity_id]["current_state"] = {
+                                "state": current_state_val.state,
+                                "attributes": dict(current_state_val.attributes),
+                                "last_changed": current_state_val.last_changed.isoformat() if current_state_val.last_changed else None,
+                                "last_updated": current_state_val.last_updated.isoformat() if current_state_val.last_updated else None,
+                            }
+
+                else:
+                    _LOGGER.warning(f"Unknown history period key: {history_period_key} for entity {entity_id}. Defaulting to latest only.")
+                    # Fallback to latest only for this entity if key is unknown (should not happen with config flow)
+                    state = hass.states.get(entity_id)
+                    if state:
+                         entity_data_map[entity_id] = {
+                            "current_state": {
+                                "state": state.state,
+                                "attributes": dict(state.attributes),
+                                "last_changed": state.last_changed.isoformat() if state.last_changed else None,
+                                "last_updated": state.last_updated.isoformat() if state.last_updated else None,
+                            }
+                        }
+                    else:
+                        entity_data_map[entity_id] = {"current_state": None}
+                        _LOGGER.warning(f"Entity {entity_id} not found for current state.")
+
+        import json
         entity_data_json = json.dumps(entity_data_map, indent=2)
 
+        if len(entity_data_json) > 100000: # Arbitrary limit, Gemini has token limits
+            _LOGGER.warning(
+                f"The data payload for Gemini is very large ({len(entity_data_json)} bytes). "
+                "This might lead to API errors, high costs, or truncated analysis. "
+                "Consider selecting fewer entities or a shorter history period."
+            )
+
         try:
-            # The GeminiClient's get_insights method is synchronous.
+            # The GeminiClient's get_insights method is synchronous (def, not async def).
+
             # The DataUpdateCoordinator will run this in an executor thread.
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json

@@ -41,7 +41,6 @@ class GeminiClient:
         )
         _LOGGER.info("Gemini Client initialized with model gemini-1.5-flash-latest")
 
-
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
 
         """

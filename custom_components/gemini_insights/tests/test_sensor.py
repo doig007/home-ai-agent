@@ -15,9 +15,15 @@ from custom_components.gemini_insights.const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
-    DEFAULT_PROMPT,
-    DEFAULT_UPDATE_INTERVAL,
+    CONF_HISTORY_PERIOD,
+    HISTORY_LATEST_ONLY,
+    HISTORY_24_HOURS,
 )
+from homeassistant.util import dt as dt_util # For time manipulation in tests
+from datetime import timedelta
+import json # For checking JSON arguments
+
+
 # from custom_components.gemini_insights.sensor import GeminiInsightsSensor # Not directly used if testing via state machine
 
 # Use common_config_data from conftest.py
@@ -26,10 +32,12 @@ COMMON_OPTIONS_DATA = {
     CONF_ENTITIES: ["sensor.test_entity1"],
     CONF_PROMPT: "Test prompt: {entity_data}",
     CONF_UPDATE_INTERVAL: 600, # 10 minutes
+    CONF_HISTORY_PERIOD: HISTORY_LATEST_ONLY, # Default for most tests
 }
 
 
-async def test_sensor_creation_and_initial_state(
+async def test_sensor_creation_and_initial_state_latest_only(
+
     hass: HomeAssistant,
     init_integration, # Fixture from conftest.py
     mock_gemini_client_class, # Fixture from conftest.py

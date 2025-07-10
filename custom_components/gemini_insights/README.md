@@ -57,7 +57,11 @@ Once the integration is added, you can configure its behavior:
 2.  Click on **"CONFIGURE"** (or "OPTIONS" if already configured).
 3.  You can set the following options:
     *   **Entities to Monitor:** Select the Home Assistant entities whose data you want to send to the Gemini API.
-    *   **Prompt Template:** Customize the prompt sent to the Gemini API. The placeholder `{entity_data}` will be replaced with a JSON string of the selected entities' states and attributes.
+    *   **History Period:** Choose how much historical data to include for the selected entities:
+        *   `Latest Only`: Only the current state of the entities is sent (default).
+        *   `1 Hour`, `6 Hours`, `12 Hours`, `24 Hours`, `3 Days`, `7 Days`: Sends significant state changes within the selected period.
+        *   **Note on History Data:** Selecting longer history periods or many entities can result in large amounts of data being sent to the Gemini API. This may increase API costs, lead to longer processing times, or hit API request size limits. Use with consideration. The data sent for history includes a list of state changes (state, attributes, last_changed, last_updated).
+    *   **Prompt Template:** Customize the prompt sent to the Gemini API. The placeholder `{entity_data}` will be replaced with a JSON string of the selected entities' states (and historical states, if configured).
         *   **Default Prompt:**
             ```
             Analyze the following Home Assistant data and provide:
@@ -82,10 +86,11 @@ Each sensor will also have attributes like `last_synced` and `raw_data` (contain
 
 ## Usage Examples
 
-*   **Monitor energy consumption:** Track your smart plugs and energy monitors to get insights into usage patterns and potential savings.
-*   **Security overview:** Summarize door/window sensor activity and motion alerts.
-*   **Environmental comfort:** Analyze temperature, humidity, and air quality sensors for trends and comfort alerts.
-*   **Custom daily reports:** Craft a prompt to get a specific daily summary of important household activities.
+*   **Monitor energy consumption:** Track your smart plugs and energy monitors. With history, you can ask for trends over the past day/week, identify peak usage times, or compare current usage to historical patterns.
+*   **Security overview:** Summarize door/window sensor activity and motion alerts. With 24-hour history, you can get a digest of all security-related events.
+*   **Environmental comfort:** Analyze temperature, humidity, and air quality sensors. Ask for average conditions, identify periods outside desired ranges, or get summaries of fluctuations over a chosen history period.
+*   **Custom daily/weekly reports:** Craft a prompt to get a specific summary of important household activities based on the historical data you've configured. For example: "Based on the last 7 days of light sensor data, what are the average times the lights turn on and off in the living room?"
+
 
 ## Troubleshooting
 
