@@ -1,5 +1,5 @@
 {
-    "name": "Gemini Insights,
+    "name": "Gemini Insights",
     "description": "A custom component for Home Assistant to gain insights via generative AI.",
     "domain": "gemini_insights",
     "codeowners": ["@doig007"],
