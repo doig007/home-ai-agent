@@ -93,6 +93,7 @@ async def test_options_flow(hass: HomeAssistant) -> None:
         CONF_PROMPT: "New custom prompt",
         CONF_UPDATE_INTERVAL: 300,
         CONF_HISTORY_PERIOD: "24_hours", # Example history period
+
     }
     result2 = await hass.config_entries.options.async_configure(
         result["flow_id"], user_input=new_options

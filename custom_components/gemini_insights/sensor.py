@@ -18,6 +18,7 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
+
     CONF_API_KEY,
     CONF_HISTORY_PERIOD,
     DEFAULT_HISTORY_PERIOD,
@@ -27,6 +28,7 @@ from .const import (
 from .gemini_client import GeminiClient
 from homeassistant.components import history # For fetching history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,13 +74,16 @@ async def async_setup_entry(
         # Prioritize options, then config, then empty list/default prompt
         entity_ids = options.get(CONF_ENTITIES, config.get(CONF_ENTITIES, []))
         prompt_template = options.get(CONF_PROMPT, config.get(CONF_PROMPT, DEFAULT_PROMPT))
+
         history_period_key = options.get(CONF_HISTORY_PERIOD, config.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD))
+
 
         if not entity_ids:
             _LOGGER.info("No entities configured for Gemini Insights. Skipping API call.")
             return {"insights": "No entities configured.", "alerts": "", "summary": ""}
 
         entity_data_map = {}
+
         now = dt_util.utcnow()
 
         for entity_id in entity_ids:
@@ -169,6 +174,7 @@ async def async_setup_entry(
 
         try:
             # The GeminiClient's get_insights method is synchronous (def, not async def).
+
             # The DataUpdateCoordinator will run this in an executor thread.
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
@@ -218,6 +224,7 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the state of the sensor."""
+
         if self.coordinator.data is None:
             # This can happen before the first successful update or if an update fails and returns None
             _LOGGER.debug(f"Coordinator data is None for {self.name}, returning Initializing...")
@@ -238,6 +245,7 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
+
         attrs = {}
         # Add raw_data if the last update was successful and data is available and is a dictionary
         if self.coordinator.last_update_success and \

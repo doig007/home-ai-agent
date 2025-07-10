@@ -91,6 +91,7 @@ Each sensor will also have attributes like `last_synced` and `raw_data` (contain
 *   **Environmental comfort:** Analyze temperature, humidity, and air quality sensors. Ask for average conditions, identify periods outside desired ranges, or get summaries of fluctuations over a chosen history period.
 *   **Custom daily/weekly reports:** Craft a prompt to get a specific summary of important household activities based on the historical data you've configured. For example: "Based on the last 7 days of light sensor data, what are the average times the lights turn on and off in the living room?"
 
+
 ## Troubleshooting
 
 *   **"API key not valid" errors:** Double-check your Gemini API key. Ensure it's active and has the necessary permissions.

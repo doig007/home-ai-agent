@@ -23,6 +23,7 @@ from .const import (
     HISTORY_24_HOURS,
     HISTORY_3_DAYS,
     HISTORY_7_DAYS,
+
 )
 
 # Import GeminiClient to test API key, but be careful with blocking calls
@@ -126,6 +127,7 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
             HISTORY_7_DAYS,
         ]
 
+
         options_schema = vol.Schema(
             {
                 vol.Required(
@@ -144,6 +146,7 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_HISTORY_PERIOD, default=current_history_period
                 ): vol.In(history_period_options),
+
             }
         )
 
