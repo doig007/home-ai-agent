@@ -35,11 +35,11 @@ class GeminiClient:
             raise ValueError("Gemini API key is required.")
         genai.configure(api_key=api_key)
         self._model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest", # Using flash for speed and cost
+            model_name="gemini-2.5-flash", # Using flash for speed and cost
             generation_config=DEFAULT_GENERATION_CONFIG,
             safety_settings=DEFAULT_SAFETY_SETTINGS
         )
-        _LOGGER.info("Gemini Client initialized with model gemini-1.5-flash-latest")
+        _LOGGER.info("Gemini Client initialized with model gemini-2.5-flash")
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
 
