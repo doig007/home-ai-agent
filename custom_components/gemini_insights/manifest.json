@@ -3,7 +3,7 @@
   "name": "Gemini Insights",
   "documentation": "https://github.com/doig007/HomeAssistant_AI/blob/main/README.md",
   "issue_tracker": "https://github.com/doig007/HomeAssistant_AI/issues",
-  "codeowners": ["@ydoig007"],
+  "codeowners": ["@doig007"],
   "version": "0.1.0",
   "iot_class": "cloud_polling",
   "config_flow": true,
