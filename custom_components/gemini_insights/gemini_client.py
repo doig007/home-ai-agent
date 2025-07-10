@@ -101,10 +101,10 @@ class GeminiClient:
             if not insights_data["insights"] and not insights_data["alerts"] and not insights_data["summary"]:
                  _LOGGER.warning("Gemini response was empty or not parsable by simple splitting. Raw text: %s", response.text)
                  # Fallback to using the full text if parsing fails
-            return {"insights": response.text, "alerts": "Could not parse.", "summary": "Could not parse.", "raw_text": response.text}
+                return {"insights": response.text, "alerts": "Could not parse.", "summary": "Could not parse.", "raw_text": response.text}
 
-        # Include raw_text in the successful response
-        insights_data["raw_text"] = response.text
+            # Include raw_text in the successful response
+            insights_data["raw_text"] = response.text
             return insights_data
 
         except Exception as e:
