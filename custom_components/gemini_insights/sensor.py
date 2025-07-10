@@ -161,12 +161,21 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-        if self.coordinator.data:
-            return {
-                "last_synced": self.coordinator.last_update_success_time,
-                "raw_data": self.coordinator.data # For debugging or more detailed display
-            }
-        return {}
+
+        attrs = {}
+        # Add raw_data if the last update was successful and data is available and is a dictionary
+        if self.coordinator.last_update_success and \
+           self.coordinator.data and \
+           isinstance(self.coordinator.data, dict):
+            attrs["raw_data"] = self.coordinator.data
+
+        # Add the status of the last update attempt
+        attrs["last_update_status"] = "Success" if self.coordinator.last_update_success else "Failed"
+
+        # The entity's own 'last_updated' attribute will reflect when HA last wrote its state.
+        # If a more specific timestamp from the data source is needed, it should be extracted
+        # from self.coordinator.data if available.
+        return attrs
 
     @property
     def available(self) -> bool:
