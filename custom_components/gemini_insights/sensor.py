@@ -209,15 +209,26 @@ async def async_setup_entry(
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
             )
-            if insights:
+            if insights  and "raw_text" in insights:
                 _LOGGER.debug(f"Received insights from Gemini: {insights}")
+                # Send notification with the raw response text
+                await hass.services.async_call(
+                    "notify",
+                    "mobile_app_pixel_6_pro",
+                    {"message": insights["raw_text"]},
+                    blocking=False,  # False because we don't need to wait for the notification to send
+                )
                 return insights
+            elif insights: # Partial success, but raw_text is missing
+                _LOGGER.warning(f"Received insights from Gemini but raw_text is missing: {insights}")
+                # Fallback if raw_text isn't in the response for some reason
+                return {**insights, "raw_text": "Raw text not available."}
             else:
                 _LOGGER.error("Failed to get insights from Gemini.")
-                return {"insights": "Error fetching insights", "alerts": "Error", "summary": "Error"}
+                return {"insights": "Error fetching insights", "alerts": "Error", "summary": "Error", "raw_text": "Error fetching insights"}
         except Exception as e:
             _LOGGER.error(f"Exception during Gemini API call in coordinator: {e}")
-            return {"insights": f"Exception: {e}", "alerts": "Exception", "summary": "Exception"}
+            return {"insights": f"Exception: {e}", "alerts": "Exception", "summary": "Exception", "raw_text": f"Exception: {e}"}
 
     coordinator = DataUpdateCoordinator(
         hass,
@@ -235,10 +246,51 @@ async def async_setup_entry(
         GeminiInsightsSensor(coordinator, "Insights"),
         GeminiInsightsSensor(coordinator, "Alerts"),
         GeminiInsightsSensor(coordinator, "Summary"),
+        GeminiRawTextSensor(coordinator),
     ]
     async_add_entities(sensors)
 
+class GeminiRawTextSensor(CoordinatorEntity, SensorEntity):
+    """Representation of a Gemini Insights Raw Text Sensor."""
 
+    def __init__(self, coordinator: DataUpdateCoordinator):
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_name = "Gemini Raw Response"
+        # Unique ID should be based on the config entry and a unique identifier for this sensor
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_raw_text"
+        self._attr_icon = "mdi:text-box-outline" # Icon for raw text
+
+    @property
+    def native_value(self):
+        """Return the state of the sensor (the raw text)."""
+        if self.coordinator.data is None:
+            return "Initializing..."
+        
+        if hasattr(self.coordinator.data, 'get') and callable(self.coordinator.data.get):
+            return self.coordinator.data.get("raw_text", "Raw text not available")
+        else:
+            _LOGGER.warning(
+                f"Coordinator data for sensor {self.name} is not a dictionary (type: {type(self.coordinator.data)}). "
+                f"Current coordinator data (snippet): {str(self.coordinator.data)[:200]}"
+            )
+            return "Error: Invalid data structure"
+
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        attrs = {}
+        attrs["last_update_status"] = "Success" if self.coordinator.last_update_success else "Failed"
+        # The raw_text can be very long, so it's better to keep it as the main state
+        # and not duplicate it in attributes unless a snippet is desired.
+        # For now, no extra attributes beyond the standard ones.
+        return attrs
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self.coordinator.last_update_success
+        
 class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Gemini Insights Sensor."""
 
