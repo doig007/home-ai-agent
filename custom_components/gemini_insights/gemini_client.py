@@ -112,7 +112,7 @@ class GeminiClient:
             response = self._client.models.generate_content(
                 model=self._model_name,
                 contents=full_prompt, # The prompt now includes the entity data as a string
-                generation_config=DEFAULT_GENERATION_CONFIG,
+                config=DEFAULT_GENERATION_CONFIG,
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
             )
