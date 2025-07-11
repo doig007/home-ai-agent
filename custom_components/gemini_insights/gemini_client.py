@@ -73,6 +73,7 @@ class GeminiClient:
         self._model = genai.GenerativeModel(self._model_name)
         _LOGGER.info(f"Gemini Client initialized for model {self._model_name} using genai.configure() and GenerativeModel.")
 
+        
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
         """
         Get insights from the Gemini API based on the provided prompt and entity data.
@@ -100,6 +101,7 @@ class GeminiClient:
             # Call generate_content on the GenerativeModel instance, passing arguments directly.
             # This aligns with google-genai==1.7.0 SDK practices.
             response = self._model.generate_content(
+
                 contents=full_prompt,
                 generation_config=gen_config_obj,
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
