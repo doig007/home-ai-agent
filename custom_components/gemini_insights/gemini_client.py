@@ -2,9 +2,7 @@
 import logging
 from typing import Self
 
-# FINAL CORRECTED IMPORTS:
-# Import the library under its canonical name 'google.generativeai'
-# This ensures we get the version with the .configure() method.
+# Correct import for the library version that uses .configure()
 import google.generativeai as genai
 from google.generativeai import types as genai_types
 
@@ -18,10 +16,26 @@ DEFAULT_SAFETY_SETTINGS = [
         category="HARM_CATEGORY_HARASSMENT",
         threshold="BLOCK_MEDIUM_AND_ABOVE",
     ),
-    # ... (other settings are correct)
+    genai_types.SafetySettingDict(
+        category="HARM_CATEGORY_HATE_SPEECH",
+        threshold="BLOCK_MEDIUM_AND_ABOVE",
+    ),
+    genai_types.SafetySettingDict(
+        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold="BLOCK_MEDIUM_AND_ABOVE",
+    ),
+    genai_types.SafetySettingDict(
+        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold="BLOCK_MEDIUM_AND_ABOVE",
+    ),
 ]
 
-BASE_GENERATION_CONFIG_PARAMS = { "temperature": 0.7, "top_p": 1, "top_k": 1, "max_output_tokens": 8192 }
+BASE_GENERATION_CONFIG_PARAMS = {
+    "temperature": 0.7,
+    "top_p": 1,
+    "top_k": 1,
+    "max_output_tokens": 8192,
+}
 
 GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
     name="generate_insights",
@@ -46,33 +60,32 @@ class GeminiClient:
     """A client for the Google Gemini API, using the correct initialization."""
 
     def __init__(self):
-        """
-        Initialize the Gemini client.
-        The model is now created here, assuming genai.configure has been called.
-        """
+        """Initializes the Gemini client with a model."""
         self._model_name = "gemini-1.5-flash"
         self._model = genai.GenerativeModel(self._model_name)
         _LOGGER.info(f"Gemini Client initialized for model {self._model_name}")
 
     @classmethod
     async def async_create(cls, hass: HomeAssistant, api_key: str) -> Self:
-        """
-        Asynchronously create the GeminiClient by safely configuring the API key.
-        """
+        """Asynchronously create the GeminiClient by safely configuring the API key."""
         if not api_key:
             raise ValueError("Gemini API key is required.")
 
-        # genai.configure() is a blocking I/O call.
-        # It must be run in an executor thread to not block Home Assistant.
-        await hass.async_add_executor_job(genai.configure, api_key)
+        # === FINAL FIX ===
+        # The error "configure() takes 0 positional arguments but 1 was given" means
+        # we MUST call it with a keyword argument, like genai.configure(api_key=...).
+        # We use a lambda here to pass this keyword argument call to the executor.
+        await hass.async_add_executor_job(
+            lambda: genai.configure(api_key=api_key)
+        )
         
         # Now that the API key is configured globally, we can instantiate the class.
         return cls()
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
         """Get insights from the Gemini API. This method remains synchronous."""
-        full_prompt = prompt.format(entity_data=entity_data_json)
         # ... [The rest of this method is correct and unchanged] ...
+        full_prompt = prompt.format(entity_data=entity_data_json)
         _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...")
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
@@ -84,7 +97,7 @@ class GeminiClient:
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
             )
-            # (The rest of your excellent response parsing logic follows)
+            
             _LOGGER.debug(f"Raw Gemini API response object: {response}")
 
             if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
