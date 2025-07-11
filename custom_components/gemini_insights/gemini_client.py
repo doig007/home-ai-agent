@@ -8,7 +8,6 @@ from .const import CONF_API_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
-# --- [Safety Settings and other constants remain the same] ---
 # UPDATED: The class name is now SafetySettingDict in the new SDK
 DEFAULT_SAFETY_SETTINGS = [
     genai_types.SafetySettingDict(
@@ -36,19 +35,31 @@ BASE_GENERATION_CONFIG_PARAMS = {
     "max_output_tokens": 8192,
 }
 
+# UPDATED: The FunctionDeclaration parameters no longer use Schema objects.
+# They now use standard Python dictionaries that follow the OpenAPI spec.
 GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
     name="generate_insights",
     description="Generates insights, alerts, and actions based on the provided data.",
-    parameters=genai_types.Schema(
-        type=genai_types.Type.OBJECT,
-        properties={
-            'insights': genai_types.Schema(type=genai_types.Type.STRING, description="General insights derived from the data."),
-            'alerts': genai_types.Schema(type=genai_types.Type.STRING, description="Specific alerts or warnings based on the data."),
-            'actions': genai_types.Schema(type=genai_types.Type.STRING, description="Suggested actions or next steps."),
+    parameters={
+        'type': 'object',
+        'properties': {
+            'insights': {
+                'type': 'string',
+                'description': "General insights derived from the data."
+            },
+            'alerts': {
+                'type': 'string',
+                'description': "Specific alerts or warnings based on the data."
+            },
+            'actions': {
+                'type': 'string',
+                'description': "Suggested actions or next steps."
+            },
         },
-        required=['insights', 'alerts', 'actions']
-    )
+        'required': ['insights', 'alerts', 'actions']
+    }
 )
+
 
 INSIGHTS_TOOL = genai_types.Tool(
     function_declarations=[GENERATE_INSIGHTS_FUNCTION_DECLARATION]
