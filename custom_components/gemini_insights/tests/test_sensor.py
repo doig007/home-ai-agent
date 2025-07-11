@@ -52,7 +52,8 @@ async def test_sensor_creation_and_initial_state_latest_only(
     initial_api_response = {
         "insights": "Initial test insights",
         "alerts": "Initial test alerts",
-        "summary": "Initial test summary",
+        "actions": "Initial test actions", # Changed from summary
+        "raw_text": "{'insights': 'Initial test insights', 'alerts': 'Initial test alerts', 'actions': 'Initial test actions'}" # Simulate raw_text
     }
     mock_client_instance.get_insights.return_value = initial_api_response
 
@@ -80,17 +81,20 @@ async def test_sensor_creation_and_initial_state_latest_only(
     # Check that sensors are created and have the initial state from the mock API response
     insights_sensor = hass.states.get("sensor.gemini_insights")
     alerts_sensor = hass.states.get("sensor.gemini_alerts")
-    summary_sensor = hass.states.get("sensor.gemini_summary")
+    actions_sensor = hass.states.get("sensor.gemini_actions") # Changed from summary_sensor
 
     assert insights_sensor is not None, "Insights sensor was not created"
     assert alerts_sensor is not None, "Alerts sensor was not created"
-    assert summary_sensor is not None, "Summary sensor was not created"
+    assert actions_sensor is not None, "Actions sensor was not created" # Changed
 
     assert insights_sensor.state == initial_api_response["insights"]
     assert alerts_sensor.state == initial_api_response["alerts"]
-    assert summary_sensor.state == initial_api_response["summary"]
+    assert actions_sensor.state == initial_api_response["actions"] # Changed
 
+    # The "raw_data" attribute on the sensor now stores the whole dict returned by get_insights
     assert insights_sensor.attributes.get("raw_data") == initial_api_response
+    assert alerts_sensor.attributes.get("raw_data") == initial_api_response # Assuming all sensors get it
+    assert actions_sensor.attributes.get("raw_data") == initial_api_response # Assuming all sensors get it
 
 
 async def test_sensor_update_reflects_new_api_data(
@@ -126,7 +130,8 @@ async def test_sensor_update_reflects_new_api_data(
     updated_api_response = {
         "insights": "Updated insights from API",
         "alerts": "Updated alerts from API",
-        "summary": "Updated summary from API",
+        "actions": "Updated actions from API", # Changed from summary
+        "raw_text": "{'insights': 'Updated insights from API', 'alerts': 'Updated alerts from API', 'actions': 'Updated actions from API'}"
     }
     mock_client_instance.get_insights.return_value = updated_api_response
 
@@ -136,12 +141,14 @@ async def test_sensor_update_reflects_new_api_data(
 
     insights_sensor = hass.states.get("sensor.gemini_insights")
     alerts_sensor = hass.states.get("sensor.gemini_alerts")
-    summary_sensor = hass.states.get("sensor.gemini_summary")
+    actions_sensor = hass.states.get("sensor.gemini_actions") # Changed
 
     assert insights_sensor.state == updated_api_response["insights"]
     assert alerts_sensor.state == updated_api_response["alerts"]
-    assert summary_sensor.state == updated_api_response["summary"]
+    assert actions_sensor.state == updated_api_response["actions"] # Changed
     assert insights_sensor.attributes.get("raw_data") == updated_api_response
+    assert alerts_sensor.attributes.get("raw_data") == updated_api_response
+    assert actions_sensor.attributes.get("raw_data") == updated_api_response
 
 
 async def test_sensor_handles_api_error_gracefully(
@@ -175,12 +182,13 @@ async def test_sensor_handles_api_error_gracefully(
 
     insights_sensor = hass.states.get("sensor.gemini_insights")
     alerts_sensor = hass.states.get("sensor.gemini_alerts")
-    summary_sensor = hass.states.get("sensor.gemini_summary")
+    actions_sensor = hass.states.get("sensor.gemini_actions") # Changed
 
     # Check state based on sensor.py's error handling for None response
-    assert insights_sensor.state == "Error fetching insights"
-    assert alerts_sensor.state == "Error"
-    assert summary_sensor.state == "Error"
+    # (This assumes GeminiInsightsSensor.update_from_data sets these specific strings)
+    assert insights_sensor.state == "Error fetching insights" # Or whatever the sensor's error state is
+    assert alerts_sensor.state == "Error"  # Or specific error state for alerts sensor
+    assert actions_sensor.state == "Error" # Or specific error state for actions sensor
 
     # Simulate a more specific exception from the client's get_insights call
     mock_client_instance.get_insights.side_effect = Exception("Simulated API connection problem")
@@ -236,3 +244,53 @@ async def test_sensor_when_no_entities_configured(
     await hass.async_block_till_done()
 
     mock_client_instance.get_insights.assert_not_called()
+
+
+async def test_sensor_handles_direct_text_response_from_client(
+    hass: HomeAssistant,
+    init_integration,
+    mock_gemini_client_class,
+    common_config_data
+) -> None:
+    """Test sensor behavior when GeminiClient indicates a direct text response (no function call)."""
+    config_entry = init_integration
+    mock_client_instance = mock_gemini_client_class.return_value
+
+    hass.states.async_set("sensor.test_entity1", "789")
+    hass.config_entries.async_update_entry(config_entry, options=COMMON_OPTIONS_DATA)
+    await hass.async_block_till_done()
+
+    # This is what GeminiClient.get_insights would return if the API responded with text
+    # instead of a function call, after the changes we made to GeminiClient.
+    direct_text_response_data = {
+        "insights": "This is a direct text response.",
+        "alerts": "No function call; direct text response.",
+        "actions": "", # Or some other default/indicator
+        "raw_text": "This is a direct text response." # Simulating raw text from API
+    }
+    mock_client_instance.get_insights.return_value = direct_text_response_data
+
+    coordinator: DataUpdateCoordinator = None
+    for coord_obj in hass.data.get("update_coordinator", {}).values():
+        if coord_obj.name == "gemini_insights_sensor":
+            coordinator = coord_obj
+            break
+    assert coordinator is not None, "DataUpdateCoordinator not found"
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    insights_sensor = hass.states.get("sensor.gemini_insights")
+    alerts_sensor = hass.states.get("sensor.gemini_alerts")
+    actions_sensor = hass.states.get("sensor.gemini_actions")
+
+    assert insights_sensor is not None
+    assert alerts_sensor is not None
+    assert actions_sensor is not None
+
+    assert insights_sensor.state == direct_text_response_data["insights"]
+    assert alerts_sensor.state == direct_text_response_data["alerts"]
+    assert actions_sensor.state == direct_text_response_data["actions"]
+    assert insights_sensor.attributes.get("raw_data") == direct_text_response_data
+    assert alerts_sensor.attributes.get("raw_data") == direct_text_response_data
+    assert actions_sensor.attributes.get("raw_data") == direct_text_response_data
