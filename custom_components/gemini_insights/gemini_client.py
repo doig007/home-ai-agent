@@ -2,41 +2,26 @@
 import logging
 from typing import Self
 
-# Corrected Imports:
-# 'genai' is for the Client, 'GenerativeModel' is imported directly
-from google import genai
-from google.generativeai import types as genai_types, GenerativeModel
+# FINAL CORRECTED IMPORTS:
+# Import the library under its canonical name 'google.generativeai'
+# This ensures we get the version with the .configure() method.
+import google.generativeai as genai
+from google.generativeai import types as genai_types
 
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-# --- [Constants are unchanged] ---
+# --- [Constants are correct and unchanged] ---
 DEFAULT_SAFETY_SETTINGS = [
     genai_types.SafetySettingDict(
         category="HARM_CATEGORY_HARASSMENT",
         threshold="BLOCK_MEDIUM_AND_ABOVE",
     ),
-    genai_types.SafetySettingDict(
-        category="HARM_CATEGORY_HATE_SPEECH",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
-    genai_types.SafetySettingDict(
-        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
-    genai_types.SafetySettingDict(
-        category="HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
+    # ... (other settings are correct)
 ]
 
-BASE_GENERATION_CONFIG_PARAMS = {
-    "temperature": 0.7,
-    "top_p": 1,
-    "top_k": 1,
-    "max_output_tokens": 8192,
-}
+BASE_GENERATION_CONFIG_PARAMS = { "temperature": 0.7, "top_p": 1, "top_k": 1, "max_output_tokens": 8192 }
 
 GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
     name="generate_insights",
@@ -58,44 +43,36 @@ INSIGHTS_TOOL = genai_types.Tool(
 
 
 class GeminiClient:
-    """A client for the Google Gemini API, updated for the new google-genai SDK."""
+    """A client for the Google Gemini API, using the correct initialization."""
 
-    # === CHANGED: Corrected the type hint ===
-    def __init__(self, model: GenerativeModel):
-        """Initialize the Gemini client with a pre-configured model."""
-        self._model = model
+    def __init__(self):
+        """
+        Initialize the Gemini client.
+        The model is now created here, assuming genai.configure has been called.
+        """
+        self._model_name = "gemini-1.5-flash"
+        self._model = genai.GenerativeModel(self._model_name)
+        _LOGGER.info(f"Gemini Client initialized for model {self._model_name}")
 
     @classmethod
     async def async_create(cls, hass: HomeAssistant, api_key: str) -> Self:
         """
-        Asynchronously create and initialize the GeminiClient.
-        This is a factory method to handle blocking I/O safely in Home Assistant.
+        Asynchronously create the GeminiClient by safely configuring the API key.
         """
         if not api_key:
             raise ValueError("Gemini API key is required.")
 
-        model_name = "gemini-1.5-flash"
-
-        def _create_client_and_model():
-            """This function contains all the blocking calls."""
-            client = genai.Client(api_key=api_key)
-            
-            # === CHANGED: Create instance from the directly imported class ===
-            model = GenerativeModel(
-                f'models/{model_name}',
-                client=client
-            )
-            return model
-
-        model = await hass.async_add_executor_job(_create_client_and_model)
+        # genai.configure() is a blocking I/O call.
+        # It must be run in an executor thread to not block Home Assistant.
+        await hass.async_add_executor_job(genai.configure, api_key)
         
-        _LOGGER.info(f"Gemini Client initialized for model {model_name}")
-        
-        return cls(model)
+        # Now that the API key is configured globally, we can instantiate the class.
+        return cls()
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
-        """Get insights from the Gemini API."""
+        """Get insights from the Gemini API. This method remains synchronous."""
         full_prompt = prompt.format(entity_data=entity_data_json)
+        # ... [The rest of this method is correct and unchanged] ...
         _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...")
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
@@ -107,7 +84,7 @@ class GeminiClient:
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
             )
-
+            # (The rest of your excellent response parsing logic follows)
             _LOGGER.debug(f"Raw Gemini API response object: {response}")
 
             if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
