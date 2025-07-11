@@ -9,20 +9,21 @@ from .const import CONF_API_KEY
 _LOGGER = logging.getLogger(__name__)
 
 # --- [Safety Settings and other constants remain the same] ---
+# UPDATED: The class name is now SafetySettingDict in the new SDK
 DEFAULT_SAFETY_SETTINGS = [
-    genai_types.SafetySetting(
+    genai_types.SafetySettingDict(
         category="HARM_CATEGORY_HARASSMENT",
         threshold="BLOCK_MEDIUM_AND_ABOVE",
     ),
-    genai_types.SafetySetting(
+    genai_types.SafetySettingDict(
         category="HARM_CATEGORY_HATE_SPEECH",
         threshold="BLOCK_MEDIUM_AND_ABOVE",
     ),
-    genai_types.SafetySetting(
+    genai_types.SafetySettingDict(
         category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
         threshold="BLOCK_MEDIUM_AND_ABOVE",
     ),
-    genai_types.SafetySetting(
+    genai_types.SafetySettingDict(
         category="HARM_CATEGORY_DANGEROUS_CONTENT",
         threshold="BLOCK_MEDIUM_AND_ABOVE",
     ),
@@ -32,7 +33,7 @@ BASE_GENERATION_CONFIG_PARAMS = {
     "temperature": 0.7,
     "top_p": 1,
     "top_k": 1,
-    "max_output_tokens": 8192, # Adjusted for safety, 64k is very large
+    "max_output_tokens": 8192,
 }
 
 GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
@@ -63,7 +64,6 @@ class GeminiClient:
             raise ValueError("Gemini API key is required.")
 
         # NEW SDK CHANGE: Create a client instance with the API key.
-        # There is no genai.configure() in the new SDK.
         self._client = genai.Client(api_key=api_key)
         
         self._model_name = "gemini-1.5-flash"
