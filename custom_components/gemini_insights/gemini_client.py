@@ -2,8 +2,10 @@
 import logging
 from typing import Self
 
+# Corrected Imports:
+# 'genai' is for the Client, 'GenerativeModel' is imported directly
 from google import genai
-from google.generativeai import types as genai_types
+from google.generativeai import types as genai_types, GenerativeModel
 
 from homeassistant.core import HomeAssistant
 
@@ -58,7 +60,8 @@ INSIGHTS_TOOL = genai_types.Tool(
 class GeminiClient:
     """A client for the Google Gemini API, updated for the new google-genai SDK."""
 
-    def __init__(self, model: genai.GenerativeModel):
+    # === CHANGED: Corrected the type hint ===
+    def __init__(self, model: GenerativeModel):
         """Initialize the Gemini client with a pre-configured model."""
         self._model = model
 
@@ -75,23 +78,19 @@ class GeminiClient:
 
         def _create_client_and_model():
             """This function contains all the blocking calls."""
-            # 1. This is a blocking call that loads SSL certificates.
             client = genai.Client(api_key=api_key)
             
-            # 2. This is the corrected way to get the model.
-            # You pass the client object to the model's constructor.
-            model = genai.GenerativeModel(
+            # === CHANGED: Create instance from the directly imported class ===
+            model = GenerativeModel(
                 f'models/{model_name}',
                 client=client
             )
             return model
 
-        # Run the blocking operations in Home Assistant's executor thread pool
         model = await hass.async_add_executor_job(_create_client_and_model)
         
         _LOGGER.info(f"Gemini Client initialized for model {model_name}")
         
-        # Return an instance of the class
         return cls(model)
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
@@ -102,47 +101,44 @@ class GeminiClient:
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
         try:
-            # The rest of the logic remains the same
             response = self._model.generate_content(
                 contents=full_prompt,
                 generation_config=gen_config_obj,
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
             )
-            # ... [response parsing logic is unchanged] ...
+
+            _LOGGER.debug(f"Raw Gemini API response object: {response}")
+
+            if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
+                _LOGGER.warning("Gemini response did not contain expected content parts. Raw response: %s", response)
+                return {"insights": "No content parts in response.", "alerts": "", "actions": "", "raw_text": str(response)}
+
+            function_call = None
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    function_call = part.function_call
+                    break
+            
+            if not function_call:
+                text_response = response.text if hasattr(response, 'text') else "N/A"
+                _LOGGER.warning("Gemini response did not include a function call. Text response: %s", text_response)
+                if hasattr(response, 'text') and response.text:
+                    return {"insights": response.text, "alerts": "No function call; direct text response.", "actions": "", "raw_text": response.text}
+                return {"insights": "No function call in response and no fallback text.", "alerts": "", "actions": "", "raw_text": str(response)}
+
+            if function_call.name != "generate_insights":
+                _LOGGER.warning(f"Gemini called an unexpected function: {function_call.name}. Raw response: {response}")
+                return {"insights": f"Unexpected function call: {function_call.name}", "alerts": "", "actions": "", "raw_text": str(response)}
+
+            structured_data = dict(function_call.args)
+            structured_data["raw_text"] = response.text if hasattr(response, 'text') else ""
+
+            _LOGGER.info(f"Successfully extracted structured data: {structured_data}")
+            return structured_data
 
         except Exception as e:
             _LOGGER.error(f"Error calling Gemini API or processing its response: {e}")
             if "API key not valid" in str(e) or "PermissionDenied" in str(e) or "API_KEY_INVALID" in str(e).upper():
-                _LOGGER.error("Invalid or unauthorized Gemini API Key.")
+                 _LOGGER.error("Invalid or unauthorized Gemini API Key.")
             return None
-        
-        # This part of your code was missing from previous versions but is needed
-        _LOGGER.debug(f"Raw Gemini API response object: {response}")
-
-        if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
-            _LOGGER.warning("Gemini response did not contain expected content parts. Raw response: %s", response)
-            return {"insights": "No content parts in response.", "alerts": "", "actions": "", "raw_text": str(response)}
-
-        function_call = None
-        for part in response.candidates[0].content.parts:
-            if part.function_call:
-                function_call = part.function_call
-                break
-        
-        if not function_call:
-            text_response = response.text if hasattr(response, 'text') else "N/A"
-            _LOGGER.warning("Gemini response did not include a function call. Text response: %s", text_response)
-            if hasattr(response, 'text') and response.text:
-                return {"insights": response.text, "alerts": "No function call; direct text response.", "actions": "", "raw_text": response.text}
-            return {"insights": "No function call in response and no fallback text.", "alerts": "", "actions": "", "raw_text": str(response)}
-
-        if function_call.name != "generate_insights":
-            _LOGGER.warning(f"Gemini called an unexpected function: {function_call.name}. Raw response: {response}")
-            return {"insights": f"Unexpected function call: {function_call.name}", "alerts": "", "actions": "", "raw_text": str(response)}
-
-        structured_data = dict(function_call.args)
-        structured_data["raw_text"] = response.text if hasattr(response, 'text') else ""
-
-        _LOGGER.info(f"Successfully extracted structured data: {structured_data}")
-        return structured_data
