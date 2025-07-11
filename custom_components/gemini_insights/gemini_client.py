@@ -67,9 +67,11 @@ class GeminiClient:
         """Initialize the Gemini client."""
         if not api_key:
             raise ValueError("Gemini API key is required.")
-        # For google-genai, API key is passed to Client or set via GEMINI_API_KEY env var
-        self._client = genai.Client(api_key=api_key)
-        self._model_name = "gemini-1.5-flash" 
+        # Configure the API key globally for the google.generativeai module
+        genai.configure(api_key=api_key)
+        self._model_name = "gemini-1.5-flash"
+        # Initialize the GenerativeModel instance
+        self._model = genai.GenerativeModel(self._model_name)
         _LOGGER.info(f"Gemini Client initialized for model {self._model_name} and insights tool")
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
@@ -89,28 +91,17 @@ class GeminiClient:
         _LOGGER.info(f"Full prompt for Gemini API: {full_prompt}")
         _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...")
 
-        # Consolidate all configuration into a single GenerateContentConfig object
-        generation_config = types.GenerateContentConfig(
-            **BASE_GENERATION_CONFIG_PARAMS, # Unpack base parameters
-            safety_settings=DEFAULT_SAFETY_SETTINGS,
-            tools=[INSIGHTS_TOOL]
-            # To ensure the model returns a function call to be parsed,
-            # rather than calling a Python function directly (if one were provided),
-            # and if the default behavior isn't already to return the call,
-            # one might need:
-            # automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
-            # However, since we provide a FunctionDeclaration, not a Python callable,
-            # the model should return the call for us to process.
-            # The new SDK documentation for "Manually declare and invoke a function"
-            # shows that passing a Tool with FunctionDeclaration results in
-            # response.function_calls being populated.
-        )
+        # Create a GenerationConfig object for parameters like temperature, top_p, etc.
+        gen_config_object = types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
         try:
-            response = self._client.models.generate_content(
-                model=self._model_name,
+            # Call generate_content on the GenerativeModel instance
+            # Pass contents, generation_config, safety_settings, and tools as distinct arguments
+            response = self._model.generate_content(
                 contents=full_prompt,
-                generation_config=generation_config # Pass the consolidated config
+                generation_config=gen_config_object,
+                safety_settings=DEFAULT_SAFETY_SETTINGS,
+                tools=[INSIGHTS_TOOL]
             )
 
             _LOGGER.debug(f"Raw Gemini API response object: {response}")
