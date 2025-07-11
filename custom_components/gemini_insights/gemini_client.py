@@ -66,13 +66,14 @@ class GeminiClient:
         if not api_key:
             raise ValueError("Gemini API key is required.")
         
-        # Initialize the genai Client with the API key
-        # This is assumed to be the correct method for the SDK version in the environment,
-        # given the previous AttributeError with genai.configure.
-        self._client = genai.Client(api_key=api_key)
+        # Configure the genai library with the API key, standard for google-genai 1.7.0
+        genai.configure(api_key=api_key)
         self._model_name = "gemini-1.5-flash" # Ensure this model is compatible with the new SDK version
-        _LOGGER.info(f"Gemini Client initialized for model {self._model_name} using genai.Client.")
+        # Initialize the GenerativeModel
+        self._model = genai.GenerativeModel(self._model_name)
+        _LOGGER.info(f"Gemini Client initialized for model {self._model_name} using genai.configure() and GenerativeModel.")
 
+        
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
         """
         Get insights from the Gemini API based on the provided prompt and entity data.
@@ -90,24 +91,21 @@ class GeminiClient:
         _LOGGER.info(f"Full prompt for Gemini API: {full_prompt}")
         _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...")
 
-        # Construct the full configuration for the API call using GenerateContentConfig.
-        # The 'generation_config' field is passed as a dictionary based on the hypothesis
-        # that this will resolve the Pydantic "Extra inputs are not permitted" error
-        # for the SDK version implied by the environment.
-        request_config = genai_types.GenerateContentConfig(
-            generation_config=BASE_GENERATION_CONFIG_PARAMS,  # Pass dict directly
-            safety_settings=DEFAULT_SAFETY_SETTINGS,
-            tools=[INSIGHTS_TOOL]
-            # If automatic function calling needs to be disabled (default is enabled):
-            # automatic_function_calling={'disable': True},
+        # Construct the GenerationConfig object directly.
+        gen_config_obj = genai_types.GenerationConfig(
+            **BASE_GENERATION_CONFIG_PARAMS
+            # response_mime_type="application/json" # This would go here if needed
         )
 
         try:
-            # Call generate_content using self._client.models
-            response = self._client.models.generate_content(
-                model=f"models/{self._model_name}", # Model name needs to be prefixed with "models/"
+            # Call generate_content on the GenerativeModel instance, passing arguments directly.
+            # This aligns with google-genai==1.7.0 SDK practices.
+            response = self._model.generate_content(
+
                 contents=full_prompt,
-                config=request_config
+                generation_config=gen_config_obj,
+                safety_settings=DEFAULT_SAFETY_SETTINGS,
+                tools=[INSIGHTS_TOOL]
             )
 
             _LOGGER.debug(f"Raw Gemini API response object: {response}")
