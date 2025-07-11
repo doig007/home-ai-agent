@@ -7,6 +7,6 @@
   "version": "0.1.0",
   "iot_class": "cloud_polling",
   "config_flow": true,
-  "requirements": ["google-generativeai>=0.3.0"],
+  "requirements": ["google-genai>=1.0.0"],
   "dependencies": ["history"]
 }
