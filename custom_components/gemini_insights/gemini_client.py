@@ -57,13 +57,14 @@ INSIGHTS_TOOL = genai_types.Tool(
 
 
 class GeminiClient:
-    """A client for the Google Gemini API, using the correct initialization."""
+    """A client for the Google Gemini API, using a chat session for context cache."""
 
     def __init__(self):
-        """Initializes the Gemini client with a model."""
+        """Initializes the Gemini client with a model and a chat session."""
         self._model_name = "gemini-1.5-flash"
         self._model = genai.GenerativeModel(self._model_name)
-        _LOGGER.info(f"Gemini Client initialized for model {self._model_name}")
+        self._chat_session = self._model.start_chat()
+        _LOGGER.info(f"Gemini Client initialized for model {self._model_name} with context caching.")
 
     @classmethod
     async def async_create(cls, hass: HomeAssistant, api_key: str) -> Self:
@@ -71,28 +72,24 @@ class GeminiClient:
         if not api_key:
             raise ValueError("Gemini API key is required.")
 
-        # === FINAL FIX ===
-        # The error "configure() takes 0 positional arguments but 1 was given" means
-        # we MUST call it with a keyword argument, like genai.configure(api_key=...).
-        # We use a lambda here to pass this keyword argument call to the executor.
+        # Configure the API key using a keyword argument in the executor.
         await hass.async_add_executor_job(
             lambda: genai.configure(api_key=api_key)
         )
         
-        # Now that the API key is configured globally, we can instantiate the class.
         return cls()
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
-        """Get insights from the Gemini API. This method remains synchronous."""
-        # ... [The rest of this method is correct and unchanged] ...
+        """Get insights from the Gemini API using the chat session for context."""
         full_prompt = prompt.format(entity_data=entity_data_json)
         _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...")
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
         try:
-            response = self._model.generate_content(
-                contents=full_prompt,
+            # Use the chat session to send the message, maintaining context
+            response = self._chat_session.send_message(
+                content=full_prompt,
                 generation_config=gen_config_obj,
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
