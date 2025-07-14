@@ -118,7 +118,10 @@ class GeminiClient:
                 return {"insights": f"Unexpected function call: {function_call.name}", "alerts": "", "actions": "", "raw_text": str(response)}
 
             structured_data = dict(function_call.args)
-            structured_data["raw_text"] = response.text if hasattr(response, 'text') else ""
+            # When a function call is returned, response.text is empty.
+            # We'll create a JSON string from the structured data as the raw text.
+            structured_data["raw_text"] = f"Function Call: {function_call.name}\n" \
+                                          f"Arguments: {function_call.args}"
 
             _LOGGER.info(f"Successfully extracted structured data: {structured_data}")
             return structured_data
