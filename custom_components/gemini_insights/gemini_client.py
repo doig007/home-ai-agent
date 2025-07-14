@@ -61,7 +61,7 @@ class GeminiClient:
 
     def __init__(self):
         """Initializes the Gemini client with a model and a chat session."""
-        self._model_name = "gemini-1.5-flash"
+        self._model_name = "gemini-2.5-flash"
         self._model = genai.GenerativeModel(self._model_name)
         self._chat_session = self._model.start_chat()
         _LOGGER.info(f"Gemini Client initialized for model {self._model_name} with context caching.")

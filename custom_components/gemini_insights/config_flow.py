@@ -133,12 +133,31 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_ENTITIES, default=current_entities
                 ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(multiple=True),
+                    selector.EntitySelectorConfig(
+                        multiple=True,
+                        custom_preview=True,
+                        filter={
+                            "domain": [
+                                "sensor",
+                                "binary_sensor",
+                                "switch",
+                                "light",
+                                "climate",
+                                "weather",
+                                "person",
+                                "device_tracker"
+                            ]
+                        }
+                    )
                 ),
                 vol.Required(
                     CONF_PROMPT, default=current_prompt
                 ): selector.TextSelector(
-                    selector.TextSelectorConfig(multiline=True),
+                    selector.TextSelectorConfig(
+                        multiline=True,
+                        type="text",
+                        suffix="Configure the prompt template for Gemini"
+                    )
                 ),
                 vol.Required(
                     CONF_UPDATE_INTERVAL, default=current_update_interval
