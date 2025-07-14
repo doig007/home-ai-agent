@@ -2,7 +2,6 @@
 import logging
 from typing import Self
 
-# Correct import for the library version that uses .configure()
 import google.generativeai as genai
 from google.generativeai import types as genai_types
 
@@ -10,7 +9,7 @@ from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-# --- [Constants are correct and unchanged] ---
+# --- [Constants] ---
 DEFAULT_SAFETY_SETTINGS = [
     genai_types.SafetySettingDict(
         category="HARM_CATEGORY_HARASSMENT",
