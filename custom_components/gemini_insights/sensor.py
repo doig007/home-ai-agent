@@ -49,16 +49,13 @@ async def async_setup_entry(
         _LOGGER.error("Gemini API key not found in configuration.")
         return
 
-    # === CHANGED: ASYNCHRONOUS CLIENT INITIALIZATION ===
-    # We now use the async_create factory method to properly handle
-    # the blocking I/O calls without freezing Home Assistant.
+    # === SYNCHRONOUS CLIENT INITIALIZATION ===
     try:
         gemini_client = await GeminiClient.async_create(hass, api_key)
     except Exception as e:
         _LOGGER.error(f"Failed to initialize Gemini Client: {e}")
         # Raising ConfigEntryNotReady will cause Home Assistant to retry the setup later.
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
-    # === END OF CHANGE ===
 
     update_interval_seconds = options.get(CONF_UPDATE_INTERVAL, config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL))
 
@@ -74,7 +71,6 @@ async def async_setup_entry(
             _LOGGER.info("No entities configured for Gemini Insights. Skipping API call.")
             return {"insights": "No entities configured.", "alerts": "", "actions": "", "raw_text": "No entities configured."}
 
-        # [Your existing data fetching and preprocessing logic is excellent and remains unchanged]
         entity_data_map = {}
         now = dt_util.utcnow()
 
@@ -136,8 +132,6 @@ async def async_setup_entry(
         if len(entity_data_json) > 100000:
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
 
-        # This part is already correct! `get_insights` is synchronous, so it
-        # must be run in an executor job to avoid blocking the event loop.
         try:
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
@@ -148,7 +142,7 @@ async def async_setup_entry(
                 await hass.services.async_call(
                     "notify",
                     "mobile_app_pixel_6_pro",
-                    {"message": insights.get("raw_text", "No raw text available.")},
+                    {"message": insights.get("insights", "No raw text available.")},
                     blocking=False,
                 )
                 return insights
@@ -172,15 +166,12 @@ async def async_setup_entry(
     sensors = [
         GeminiInsightsSensor(coordinator, "Insights"),
         GeminiInsightsSensor(coordinator, "Alerts"),
-        # 'Summary' was in your sensor class but not in the function declaration in the client.
-        # I've replaced it with 'actions' to match the client's output.
         GeminiInsightsSensor(coordinator, "Actions"),
         GeminiRawTextSensor(coordinator),
     ]
     async_add_entities(sensors)
 
 
-# GeminiRawTextSensor class is fine as is.
 class GeminiRawTextSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Gemini Insights Raw Text Sensor."""
 
@@ -208,8 +199,7 @@ class GeminiRawTextSensor(CoordinatorEntity, SensorEntity):
         """Return if entity is available."""
         return self.coordinator.last_update_success
 
-# I noticed the sensor class was creating a "Summary" sensor, but the tool function
-# in the client is defined to return 'actions'. I've updated the init to handle this.
+
 class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Gemini Insights Sensor."""
 
