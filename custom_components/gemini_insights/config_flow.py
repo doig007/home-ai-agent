@@ -142,11 +142,10 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 vol.Required(
                     CONF_UPDATE_INTERVAL, default=current_update_interval
-                ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)), # 1 min to 1 day
+                ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)),
                 vol.Required(
                     CONF_HISTORY_PERIOD, default=current_history_period
                 ): vol.In(history_period_options),
-
             }
         )
 
