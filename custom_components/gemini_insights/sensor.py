@@ -26,7 +26,7 @@ from .const import (
     HISTORY_PERIOD_TIMEDELTA_MAP,
 )
 from .gemini_client import GeminiClient
-from .preprocessor import preprocess_sensor_data # Import data preprocessor
+from .preprocessor import Preprocessor
 from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
@@ -130,24 +130,9 @@ async def async_setup_entry(
                             "current_state": { "state": state.state, "attributes": dict(state.attributes) }
                          }
 
-        raw_data_for_preprocessing_list = ["entity_id\tstate\tlast_changed"]
-        for entity_id_key, entity_data_value in entity_data_map.items():
-            if "current_state" in entity_data_value and entity_data_value["current_state"]:
-                state_info = entity_data_value["current_state"]
-                raw_data_for_preprocessing_list.append(
-                    f"{entity_id_key}\t{state_info.get('state', 'unknown')}\t{state_info.get('last_changed')}"
-                )
-            if "historical_states" in entity_data_value:
-                for hist_state in entity_data_value["historical_states"]:
-                    raw_data_for_preprocessing_list.append(
-                        f"{entity_id_key}\t{hist_state.get('state', 'unknown')}\t{hist_state.get('last_changed')}"
-                    )
+        preprocessor = Preprocessor(hass, entity_ids)
+        entity_data_json = await preprocessor.async_get_entity_data_json()
 
-        entity_data_json = "{}"
-        if len(raw_data_for_preprocessing_list) > 1:
-            raw_data_string_for_gemini = "\n".join(raw_data_for_preprocessing_list)
-            entity_data_json = preprocess_sensor_data(raw_data_string_for_gemini)
-        
         if len(entity_data_json) > 100000:
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
 
