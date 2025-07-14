@@ -1,4 +1,5 @@
 """Client for interacting with the Google Gemini API."""
+import json
 import logging
 from typing import Self
 
@@ -120,8 +121,13 @@ class GeminiClient:
             structured_data = dict(function_call.args)
             # When a function call is returned, response.text is empty.
             # We'll create a JSON string from the structured data as the raw text.
-            structured_data["raw_text"] = f"Function Call: {function_call.name}\n" \
-                                          f"Arguments: {function_call.args}"
+            try:
+                args_json = json.dumps(structured_data, indent=4)
+                structured_data["raw_text"] = f"Function Call: {function_call.name}\nArguments:\n{args_json}"
+            except TypeError:
+                _LOGGER.warning("Could not serialize function call arguments to JSON. Falling back to string representation.")
+                structured_data["raw_text"] = f"Function Call: {function_call.name}\n" \
+                                              f"Arguments: {function_call.args}"
 
             _LOGGER.info(f"Successfully extracted structured data: {structured_data}")
             return structured_data
