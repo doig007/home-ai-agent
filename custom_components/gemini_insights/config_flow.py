@@ -155,7 +155,7 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 ): selector.TextSelector(
                     selector.TextSelectorConfig(
                         multiline=True,
-                        type="text",
+                        type=selector.TextSelectorType.TEXT,
                         suffix="Configure the prompt template for Gemini"
                     )
                 ),

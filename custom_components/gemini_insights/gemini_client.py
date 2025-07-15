@@ -81,15 +81,14 @@ class GeminiClient:
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
         """Get insights from the Gemini API using the chat session for context."""
-        full_prompt = prompt.format(entity_data=entity_data_json)
-        _LOGGER.debug(f"Sending prompt to Gemini: {full_prompt[:500]}...")
+        _LOGGER.debug(f"Sending prompt to Gemini: {prompt[:500]}...")
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
         try:
             # Use the chat session to send the message, maintaining context
             response = self._chat_session.send_message(
-                content=full_prompt,
+                content=prompt,
                 generation_config=gen_config_obj,
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
