@@ -30,8 +30,8 @@ class Preprocessor:
         Runs in the recorder's DB executor to avoid the warning.
         """
         def _inner() -> Dict[str, List[float]]:
-            tz_now = dt_util.now()
-            end_time = tz_now.replace(hour=0, minute=0, second=0, microsecond=0)
+            now_utc = dt_util.utcnow()
+            end_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
             start_time = end_time - timedelta(days=1)
 
             stats: Dict[str, List[float]] = {}
@@ -58,9 +58,9 @@ class Preprocessor:
                         except (ValueError, TypeError):
                             continue
 
-                        # convert DB timestamp (UTC-aware) → UTC-native
-                        ts_native = s.last_updated.astimezone(tz=dt_util.UTC).replace(
-                            tzinfo=None
+                        ts_native = s.last_updated.astimezone(dt_util.UTC)
+                        slot = int(
+                            (ts_native - start_time).total_seconds() // SLOT_SECONDS
                         )
                         slot = int((ts_native - start_time).total_seconds() // SLOT_SECONDS)
                         if 0 <= slot < SLOTS_PER_DAY:
