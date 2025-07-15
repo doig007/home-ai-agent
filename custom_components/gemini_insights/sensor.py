@@ -157,18 +157,10 @@ Respond extremely briefly, suitable for a phone notification.
 """,
         )
 
-        # Inject the placeholders
-        try:
-            # parse once to access the two top-level keys
-            full_payload = json.loads(entity_data_json)
-            full_prompt = prompt_template.format(
-                long_term_stats=json.dumps(full_payload["long_term_stats"], indent=1),
-                recent_events=json.dumps(full_payload["recent_events"], indent=1),
-            )
-        except Exception as e:
-            _LOGGER.error("Failed to format prompt: %s", e)
-            return {"insights": "Prompt format error", "alerts": "", "actions": "", "raw_text": str(e)}
 
+
+        if len(entity_data_json) > 100000:
+            _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
 
         if len(entity_data_json) > 100000:
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
