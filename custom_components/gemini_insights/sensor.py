@@ -162,6 +162,9 @@ Respond extremely briefly, suitable for a phone notification.
         if len(entity_data_json) > 100000:
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
 
+        if len(entity_data_json) > 100000:
+            _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
+
         try:
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
