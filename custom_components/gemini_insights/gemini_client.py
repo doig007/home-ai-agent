@@ -85,10 +85,15 @@ class GeminiClient:
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
+        formatted_prompt = prompt.format(
+            long_term_stats=entity_data_json.get("long_term_stats", "{}"),
+            recent_events=entity_data_json.get("recent_events", "{}")
+        )
+
         try:
             # Use the chat session to send the message, maintaining context
             response = self._chat_session.send_message(
-                content=prompt,
+                content=formatted_prompt,
                 generation_config=gen_config_obj,
                 safety_settings=DEFAULT_SAFETY_SETTINGS,
                 tools=[INSIGHTS_TOOL]
