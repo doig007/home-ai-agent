@@ -166,6 +166,22 @@ Respond extremely briefly, suitable for a phone notification.
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
 
         try:
+
+            # ----------------------------------------------------------
+            # DEBUG: write prompt + data to disk
+            # ----------------------------------------------------------
+            import os, pathlib, time
+            debug_dir = pathlib.Path(__file__).with_suffix('').parent / "debug_prompts"
+            debug_dir.mkdir(exist_ok=True)
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            with open(debug_dir / f"prompt_{ts}.txt", "w", encoding="utf-8") as f:
+                f.write("==========  PROMPT  ==========\n")
+                f.write(prompt_template)
+                f.write("\n\n==========  ENTITY DATA  ==========\n")
+                f.write(entity_data_json)
+            # ----------------------------------------------------------
+
+
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
             )
