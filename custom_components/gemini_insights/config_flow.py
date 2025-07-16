@@ -135,7 +135,6 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         multiple=True,
-                        custom_preview=True,
                         filter={
                             "domain": [
                                 "sensor",
