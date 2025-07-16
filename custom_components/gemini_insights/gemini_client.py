@@ -85,13 +85,7 @@ class GeminiClient:
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
-        entity_data = {}
-        try:
-            entity_data = json.loads(entity_data_json)
-        except json.JSONDecodeError:
-            _LOGGER.error("Failed to decode entity data JSON: %s", entity_data_json)
-            # Fallback to empty data if JSON is invalid
-            entity_data = {}
+        entity_data = json.loads(entity_data_json or '{}')
 
         formatted_prompt = prompt.format(
             long_term_stats=entity_data.get("long_term_stats", "{}"),
