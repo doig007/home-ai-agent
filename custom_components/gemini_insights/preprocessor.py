@@ -47,6 +47,7 @@ class Preprocessor:
                     statistic_ids={entity_id},
                     period="5minute",
                     types={"mean"},
+                    units={},
                 )
 
                 rows = raw_rows.get(entity_id, [])
