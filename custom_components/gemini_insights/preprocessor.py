@@ -12,7 +12,6 @@ from homeassistant.util import dt as dt_util
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import (
     statistics_during_period,
-    StatisticPeriod,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ class Preprocessor:
                     start_time=start_time,
                     end_time=end_time,
                     statistic_ids={entity_id},
-                    period=StatisticPeriod.FIVE_MINUTE,
+                    period="5minute",
                     types={"mean"},
                 )
 
