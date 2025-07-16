@@ -1,7 +1,6 @@
 """Sensor platform for Gemini Insights."""
 import logging
 from datetime import timedelta
-import json
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -242,15 +241,19 @@ class GeminiRawTextSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Return the state of the sensor."""
-        if self.coordinator.data is None:
-            return "Initializing..."
-        
-        if isinstance(self.coordinator.data, dict):
-            return self.coordinator.data.get("raw_text", "Raw text not available")
-        
-        _LOGGER.warning(f"Coordinator data is not a dictionary: {type(self.coordinator.data)}")
-        return "Error: Invalid data structure"
+        """Return a short identifier instead of the full text."""
+        if not isinstance(self.coordinator.data, dict):
+            return "Error"
+        raw = self.coordinator.data.get("raw_text", "")
+        # first 50 chars + SHA-1 hash (always < 255)
+        return raw[:50] + "…" if len(raw) > 50 else raw
+
+    @property
+    def extra_state_attributes(self):
+        """Full raw text in attributes (no length limit)."""
+        if not isinstance(self.coordinator.data, dict):
+            return {}
+        return {"raw_text": self.coordinator.data.get("raw_text")}
 
     @property
     def available(self) -> bool:
