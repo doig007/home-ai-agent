@@ -89,7 +89,8 @@ class Preprocessor:
         return await get_instance(self.hass).async_add_executor_job(_inner)
 
     async def _fetch_recent_events(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Recent raw events (last 6 h)."""
+        """Recent raw events (last 6 h) with minimal token usage."""
+
         def _inner() -> Dict[str, List[Dict[str, Any]]]:
             from homeassistant.components.recorder import history
 
@@ -111,7 +112,6 @@ class Preprocessor:
                     recent[entity_id] = [
                         {
                             "state": s.state,
-                            "last_changed": s.last_changed.isoformat(),
                             "last_updated": s.last_updated.isoformat(),
                         }
                         for s in states
