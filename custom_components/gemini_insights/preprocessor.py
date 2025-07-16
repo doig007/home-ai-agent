@@ -9,6 +9,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components.recorder import get_instance
 from homeassistant.helpers.json import JSONEncoder
 from homeassistant.util import dt as dt_util
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import (
+    statistics_during_period,
+    StatisticPeriod,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,60 +26,64 @@ class Preprocessor:
         self.hass = hass
         self.entity_ids = entity_ids
 
-    # ------------------------------------------------------------------
-    # FIXED: runs inside the DB executor & uses UTC-native datetimes
-    # ------------------------------------------------------------------
-    async def _compute_long_term_stats(self) -> Dict[str, List[float]]:
+    async def _compute_long_term_stats(self) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Return 48 half-hour averages for the last COMPLETE day.
-        Runs in the recorder's DB executor to avoid the warning.
+        Return 48 labelled 30-minute averages for the last complete UTC day
+        using Home Assistant's built-in long-term statistics.
         """
-        def _inner() -> Dict[str, List[float]]:
+
+        def _inner() -> Dict[str, List[Dict[str, Any]]]:
             now_utc = dt_util.utcnow()
             end_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
             start_time = end_time - timedelta(days=1)
 
-            stats: Dict[str, List[float]] = {}
+            stats: Dict[str, List[Dict[str, Any]]] = {}
 
             for entity_id in self.entity_ids:
-                try:
-                    from homeassistant.components.recorder import history
-                    hist = history.get_significant_states(
-                        self.hass,
-                        start_time,
-                        end_time,
-                        [entity_id],
-                        include_start_time_state=True,
-                        minimal_response=False,
-                    )
-                    states = hist.get(entity_id, [])
-                    buckets: Dict[int, List[float]] = {
-                        i: [] for i in range(SLOTS_PER_DAY)
-                    }
+                # Ask for 5-minute means covering the 24 h window
+                raw_rows = statistics_during_period(
+                    hass=self.hass,
+                    start_time=start_time,
+                    end_time=end_time,
+                    statistic_ids={entity_id},
+                    period=StatisticPeriod.FIVE_MINUTE,
+                    types={"mean"},
+                )
 
-                    for s in states:
-                        try:
-                            val = float(s.state)
-                        except (ValueError, TypeError):
-                            continue
-
-                        ts_native = s.last_updated.astimezone(dt_util.UTC)
-                        slot = int(
-                            (ts_native - start_time).total_seconds() // SLOT_SECONDS
-                        )
-                        slot = int((ts_native - start_time).total_seconds() // SLOT_SECONDS)
-                        if 0 <= slot < SLOTS_PER_DAY:
-                            buckets[slot].append(val)
-
+                rows = raw_rows.get(entity_id, [])
+                if not rows:
+                    # Fallback: fill with None
                     stats[entity_id] = [
-                        round(mean(buckets[i]), 2) if buckets[i] else None
+                        {
+                            "slot_start": (
+                                start_time + timedelta(seconds=i * SLOT_SECONDS)
+                            ).isoformat(),
+                            "avg": None,
+                        }
                         for i in range(SLOTS_PER_DAY)
                     ]
-                except Exception as e:
-                    _LOGGER.exception(
-                        "Error computing long-term stats for %s: %s", entity_id, e
-                    )
-                    stats[entity_id] = [None] * SLOTS_PER_DAY
+                    continue
+
+                # Build a map slot-index -> list of 5-min means
+                buckets: Dict[int, List[float]] = {
+                    i: [] for i in range(SLOTS_PER_DAY)
+                }
+                for r in rows:
+                    ts = dt_util.utc_from_timestamp(r["start"])
+                    slot = int((ts - start_time).total_seconds() // SLOT_SECONDS)
+                    if 0 <= slot < SLOTS_PER_DAY:
+                        buckets[slot].append(r["mean"])
+
+                stats[entity_id] = [
+                    {
+                        "slot_start": (
+                            start_time + timedelta(seconds=i * SLOT_SECONDS)
+                        ).isoformat(),
+                        "avg": round(mean(buckets[i]), 2) if buckets[i] else None,
+                    }
+                    for i in range(SLOTS_PER_DAY)
+                ]
+
             return stats
 
         return await get_instance(self.hass).async_add_executor_job(_inner)
