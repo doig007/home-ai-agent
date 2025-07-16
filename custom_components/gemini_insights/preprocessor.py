@@ -72,7 +72,8 @@ class Preprocessor:
                     ts = dt_util.utc_from_timestamp(r["start"])
                     slot = int((ts - start_time).total_seconds() // SLOT_SECONDS)
                     if 0 <= slot < SLOTS_PER_DAY:
-                        buckets[slot].append(r["mean"])
+                        if (m := r.get("mean")) is not None:
+                            buckets[slot].append(m)
 
                 stats[entity_id] = [
                     {

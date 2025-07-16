@@ -31,6 +31,8 @@ from .preprocessor import Preprocessor
 from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
+PLATFORMS = ["sensor"]  # local copy in sensor.py
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -58,6 +60,13 @@ async def async_setup_entry(
         # Raising ConfigEntryNotReady will cause Home Assistant to retry the setup later.
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
 
+    # now safe to forward
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # store the client where the coordinator will pick it up later
+    domain_data["gemini_client"] = gemini_client
+    
+    # === COORDINATOR SETUP ===
     update_interval_seconds = options.get(CONF_UPDATE_INTERVAL, config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL))
 
     async def async_update_data():
