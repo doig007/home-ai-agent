@@ -39,20 +39,35 @@ BASE_GENERATION_CONFIG_PARAMS = {
 
 GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
     name="generate_insights",
-    description="Generates insights, alerts, and actions based on the provided data.",
+    description="Generates insights, alerts, actions, and (optionally) any service calls to execute.",
     parameters={
-        'type': 'object',
-        'properties': {
-            'insights': {'type': 'string', 'description': "General insights derived from the data."},
-            'alerts': {'type': 'string', 'description': "Specific alerts or warnings based on the data."},
-            'actions': {'type': 'string', 'description': "Suggested actions or next steps."},
+        "type": "object",
+        "properties": {
+            "insights":  {"type": "string"},
+            "alerts":    {"type": "string"},
+            "actions":   {"type": "string"},
+            "to_execute": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "domain": {"type": "string"},
+                        "service": {"type": "string"},
+                        "service_data": {"type": "object"},
+                    },
+                    "required": ["domain", "service", "service_data"],
+                },
+            },
         },
-        'required': ['insights', 'alerts', 'actions']
-    }
+        "required": ["insights", "alerts", "actions"],
+    },
 )
 
+
 INSIGHTS_TOOL = genai_types.Tool(
-    function_declarations=[GENERATE_INSIGHTS_FUNCTION_DECLARATION]
+    function_declarations=[
+        GENERATE_INSIGHTS_FUNCTION_DECLARATION
+    ]
 )
 
 

@@ -176,10 +176,7 @@ Respond extremely briefly, suitable for a phone notification.
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
 
         try:
-
-            # ----------------------------------------------------------
             # DEBUG: write prompt + data to disk
-            # ----------------------------------------------------------
             import os, pathlib, time
             debug_dir = pathlib.Path(__file__).with_suffix('').parent / "debug_prompts"
             debug_dir.mkdir(exist_ok=True)
@@ -189,15 +186,29 @@ Respond extremely briefly, suitable for a phone notification.
                 f.write(prompt_template)
                 f.write("\n\n==========  ENTITY DATA  ==========\n")
                 f.write(entity_data_json)
-            # ----------------------------------------------------------
-
 
             insights = await hass.async_add_executor_job(
                 gemini_client.get_insights, prompt_template, entity_data_json
             )
             if insights:
                 _LOGGER.debug(f"Received insights from Gemini: {insights.get('insights')}")
-                # The notification service call is also fine.
+
+                # Optionally execute any actions Gemini asked for
+                to_execute = insights.get("to_execute") or []
+                for call in to_execute:
+                    try:
+                        await hass.services.async_call(
+                            call["domain"],
+                            call["service"],
+                            call["service_data"],
+                            blocking=False,
+                        )
+                        _LOGGER.debug("Executed Gemini-requested action: %s", call)
+                    except Exception as e:
+                        _LOGGER.error("Failed to execute action %s - %s", call, e)
+
+
+                # Send a notification with the insights
                 await hass.services.async_call(
                     "notify",
                     "mobile_app_pixel_6_pro",
