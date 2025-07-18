@@ -165,7 +165,9 @@ Respond extremely briefly, suitable for a phone notification.
 """,
         )
 
-
+        # Get the action schema from Home Assistant and append to the prompt template
+        action_schema = await preprocessor.async_get_action_schema(hass)
+        prompt_template += f"\nAvailable actions:\n{action_schema}\n"
 
         if len(entity_data_json) > 100000:
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))

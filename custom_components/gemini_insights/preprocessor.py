@@ -132,3 +132,29 @@ class Preprocessor:
         recent = await self._fetch_recent_events()
         payload = {"long_term_stats": long_term, "recent_events": recent}
         return json.dumps(payload, cls=JSONEncoder, indent=2)
+    
+    async def async_get_action_schema(hass: HomeAssistant) -> str:
+        """Return a compact JSON list of allowed actions."""
+        from homeassistant.helpers import service
+        from homeassistant.const import ATTR_ENTITY_ID
+
+        def _build():
+            actions = []
+            services = service.async_get_all_descriptions(hass)  # cached
+            for dom, srvs in services.items():
+                for srv, desc in srvs.items():
+                    # Skip dangerous ones
+                    if srv in {"reload", "remove", "update"}:
+                        continue
+                    # Build minimal schema
+                    actions.append(
+                        {
+                            "domain": dom,
+                            "service": srv,
+                            "description": desc.get("description", ""),
+                            "fields": {k: v.get("description", "") for k, v in desc.get("fields", {}).items()},
+                        }
+                    )
+            return json.dumps(actions, separators=(",", ":"))
+
+        return await hass.async_add_executor_job(_build)
