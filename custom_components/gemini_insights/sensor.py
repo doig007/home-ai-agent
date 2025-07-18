@@ -26,7 +26,7 @@ from .const import (
     HISTORY_PERIOD_TIMEDELTA_MAP,
 )
 from .gemini_client import GeminiClient
-from .preprocessor import (Preprocessor, async_get_action_schema) 
+from .preprocessor import Preprocessor
 from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
@@ -166,7 +166,7 @@ Respond extremely briefly, suitable for a phone notification.
         )
 
         # Get the action schema from Home Assistant and append to the prompt template
-        action_schema = await async_get_action_schema(hass)
+        action_schema = await preprocessor.async_get_action_schema()
         prompt_template += f"\nAvailable actions:\n{action_schema}\n"
 
         if len(entity_data_json) > 100000:
