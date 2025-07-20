@@ -7,7 +7,9 @@ from typing import Any, Dict, List
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.recorder import get_instance
-from homeassistant.helpers.json import JSONEncoder
+from homeassistant.helpers.json import (
+    JSONEncoder,
+    service)
 from homeassistant.util import dt as dt_util
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import (
@@ -136,25 +138,27 @@ class Preprocessor:
     async def async_get_action_schema(self) -> str:
         """Return a compact JSON list of allowed actions."""
         from homeassistant.helpers import service
-        from homeassistant.const import ATTR_ENTITY_ID
-
-        def _build():
-            actions = []
-            services = service.async_get_all_descriptions(self.hass)
-            for dom, srvs in services.items():
-                for srv, desc in srvs.items():
-                    # Skip dangerous ones
-                    if srv in {"reload", "remove", "update"}:
-                        continue
-                    # Build minimal schema
-                    actions.append(
-                        {
-                            "domain": dom,
-                            "service": srv,
-                            "description": desc.get("description", ""),
-                            "fields": {k: v.get("description", "") for k, v in desc.get("fields", {}).items()},
-                        }
-                    )
-            return json.dumps(actions, separators=(",", ":"))
-
-        return await self.hass.async_add_executor_job(_build)
+        import functools
+        
+        # Fetch service descriptions (async)
+        services = await service.async_get_all_descriptions(self.hass)
+        
+        # Build the list in the event loop (tiny, safe)
+        actions = []
+        for dom, srvs in services.items():
+            for srv, desc in srvs.items():
+                if srv in {"reload", "remove", "update"}:
+                    continue
+                actions.append(
+                    {
+                        "domain": dom,
+                        "service": srv,
+                        "description": desc.get("description", ""),
+                        "fields": {k: v.get("description", "") for k, v in desc.get("fields", {}).items()},
+                    }
+                )
+        
+        # Serialize in a thread pool to avoid blocking
+        return await self.hass.async_add_executor_job(
+            functools.partial(json.dumps, actions, separators=(",", ":"))
+        )
