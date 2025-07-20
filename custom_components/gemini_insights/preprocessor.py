@@ -7,9 +7,7 @@ from typing import Any, Dict, List
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.recorder import get_instance
-from homeassistant.helpers.json import (
-    JSONEncoder,
-    service)
+from homeassistant.helpers.json import JSONEncoder
 from homeassistant.util import dt as dt_util
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import (
