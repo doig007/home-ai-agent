@@ -30,8 +30,6 @@ from .preprocessor import Preprocessor
 from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
-PLATFORMS = ["sensor"]  # local copy in sensor.py
-
 _LOGGER = logging.getLogger(__name__)
 
 
