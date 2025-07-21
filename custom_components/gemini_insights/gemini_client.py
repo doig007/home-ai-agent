@@ -102,8 +102,7 @@ class GeminiClient:
 
         entity_data = json.loads(entity_data_json or '{}')
 
-        from string import Template
-        formatted_prompt = Template(prompt).substitute(
+        formatted_prompt = prompt.format(
             long_term_stats=json.dumps(entity_data.get("long_term_stats", {}), indent=2),
             recent_events=json.dumps(entity_data.get("recent_events", {}), indent=2),
         )
