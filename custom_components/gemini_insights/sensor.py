@@ -205,12 +205,14 @@ Respond extremely briefly, suitable for a phone notification.
                 to_execute = insights.get("to_execute") or []
                 for call in to_execute:
                     try:
-                        await hass.services.async_call(
-                            call["domain"],
-                            call["service"],
-                            call["service_data"],
-                            blocking=False,
-                        )
+                        domain  = call.get("domain")
+                        service = call.get("service")
+                        service_data = call.get("service_data", {})
+                        if not all(isinstance(x, str) for x in (domain, service)):
+                            _LOGGER.warning("Skipping malformed action (missing domain/service): %s", call)
+                            continue
+
+                        await hass.services.async_call(domain, service, service_data, blocking=False)
                         _LOGGER.debug("Executed Gemini-requested action: %s", call)
                     except Exception as e:
                         _LOGGER.error("Failed to execute action %s - %s", call, e)
