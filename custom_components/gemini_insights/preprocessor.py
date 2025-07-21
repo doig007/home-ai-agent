@@ -25,21 +25,23 @@ class Preprocessor:
         self.hass = hass
         self.entity_ids = entity_ids
 
-    async def _compute_long_term_stats(self) -> Dict[str, List[Dict[str, Any]]]:
-        """
-        Return 48 labelled 30-minute averages for the last complete UTC day
-        using Home Assistant's built-in long-term statistics.
-        """
-
-        def _inner() -> Dict[str, List[Dict[str, Any]]]:
+    async def _compute_long_term_stats(self) -> Dict[str, Any]:
+        """Return 48 compact 30-min slots with per-entity averages."""
+        def _inner() -> List[Dict[str, Any]]:
             now_utc = dt_util.utcnow()
             end_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
             start_time = end_time - timedelta(days=1)
 
-            stats: Dict[str, List[Dict[str, Any]]] = {}
+            # Pre-build empty structure: 48 slots with empty entities dict
+            slots = [
+                {
+                    "slot_start": (start_time + timedelta(seconds=i * SLOT_SECONDS)).isoformat(),
+                    "entities": {},
+                }
+                for i in range(SLOTS_PER_DAY)
+            ]
 
             for entity_id in self.entity_ids:
-                # Ask for 5-minute means covering the 24 h window
                 raw_rows = statistics_during_period(
                     hass=self.hass,
                     start_time=start_time,
@@ -52,22 +54,11 @@ class Preprocessor:
 
                 rows = raw_rows.get(entity_id, [])
                 if not rows:
-                    # Fallback: fill with None
-                    stats[entity_id] = [
-                        {
-                            "slot_start": (
-                                start_time + timedelta(seconds=i * SLOT_SECONDS)
-                            ).isoformat(),
-                            "avg": None,
-                        }
-                        for i in range(SLOTS_PER_DAY)
-                    ]
+                    # Leave slot.entities[entity_id] absent (or None if you prefer)
                     continue
 
-                # Build a map slot-index -> list of 5-min means
-                buckets: Dict[int, List[float]] = {
-                    i: [] for i in range(SLOTS_PER_DAY)
-                }
+                # Map 5-minute rows into 30-minute buckets
+                buckets = {i: [] for i in range(SLOTS_PER_DAY)}
                 for r in rows:
                     ts = dt_util.utc_from_timestamp(r["start"])
                     slot = int((ts - start_time).total_seconds() // SLOT_SECONDS)
@@ -75,17 +66,13 @@ class Preprocessor:
                         if (m := r.get("mean")) is not None:
                             buckets[slot].append(m)
 
-                stats[entity_id] = [
-                    {
-                        "slot_start": (
-                            start_time + timedelta(seconds=i * SLOT_SECONDS)
-                        ).isoformat(),
-                        "avg": round(mean(buckets[i]), 2) if buckets[i] else None,
-                    }
-                    for i in range(SLOTS_PER_DAY)
-                ]
+                # Fill the slot.entities dict
+                for slot_idx in range(SLOTS_PER_DAY):
+                    vals = buckets[slot_idx]
+                    if vals:
+                        slots[slot_idx]["entities"][entity_id] = round(mean(vals), 2)
 
-            return stats
+            return slots
 
         return await get_instance(self.hass).async_add_executor_job(_inner)
 
@@ -134,18 +121,18 @@ class Preprocessor:
         return json.dumps(payload, cls=JSONEncoder, indent=2)
     
     async def async_get_action_schema(self) -> str:
-        """Return a compact JSON list of allowed actions."""
+        """Return a compact JSON list of allowed actions, minus a few dangerous ones."""
         from homeassistant.helpers import service
         import functools
         
         # Fetch service descriptions (async)
         services = await service.async_get_all_descriptions(self.hass)
         
-        # Build the list in the event loop (tiny, safe)
+        # Build the filtered list in the event loop (tiny, safe)
         actions = []
         for dom, srvs in services.items():
             for srv, desc in srvs.items():
-                if srv in {"reload", "remove", "update"}:
+                if srv in {"reload", "remove", "update", "resttart", "stop"}:
                     continue
                 actions.append(
                     {
