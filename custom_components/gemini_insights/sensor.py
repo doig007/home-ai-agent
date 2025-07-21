@@ -60,7 +60,7 @@ async def async_setup_entry(
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
 
     # now safe to forward
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS) # Removed 23:27 21/7/25
 
     # store the client where the coordinator will pick it up later
     domain_data["gemini_client"] = gemini_client
