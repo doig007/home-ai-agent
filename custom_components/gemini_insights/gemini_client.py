@@ -108,6 +108,8 @@ class GeminiClient:
         )
 
         try:
+            _LOGGER.error("FORMATTED PROMPT:\n%s", formatted_prompt)
+
             # Use the chat session to send the message, maintaining context
             response = self._chat_session.send_message(
                 content=formatted_prompt,
@@ -141,7 +143,7 @@ class GeminiClient:
 
             structured_data = dict(function_call.args)
             _LOGGER.warning("Gemini returned: %s", structured_data)
-            
+
             # When a function call is returned, response.text is empty.
             # We'll create a JSON string from the structured data as the raw text.
             try:
