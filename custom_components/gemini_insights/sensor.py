@@ -160,12 +160,15 @@ Provide:
 3. Recommended actions.
 
 Respond extremely briefly, suitable for a phone notification.
+
+Here is the complete list of Home-Assistant service calls you are allowed to use:
+{action_schema}
+
 """,
         )
 
         # Get the action schema from Home Assistant and append to the prompt template
         action_schema = await preprocessor.async_get_action_schema()
-        prompt_template += f"\nHere is the complete list of Home-Assistant service calls you are allowed to use:\n{action_schema}\n"
 
         if len(entity_data_json) > 100000:
             _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
@@ -194,7 +197,7 @@ Respond extremely briefly, suitable for a phone notification.
             )
 
             insights = await hass.async_add_executor_job(
-                gemini_client.get_insights, prompt_template, entity_data_json
+                gemini_client.get_insights, prompt_template, entity_data_json, action_schema
             )
             if insights:
                 _LOGGER.debug(f"Received insights from Gemini: {insights.get('insights')}")

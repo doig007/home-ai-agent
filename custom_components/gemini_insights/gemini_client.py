@@ -94,16 +94,18 @@ class GeminiClient:
         
         return cls()
 
-    def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
+    def get_insights(self, prompt: str, entity_data_json: str, action_schema: str) -> dict | None:
         """Get insights from the Gemini API using the chat session for context."""
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
         entity_data = json.loads(entity_data_json or '{}')
+        action_data = json.loads(action_schema or '{}') 
 
         formatted_prompt = prompt.format(
             long_term_stats=entity_data.get("long_term_stats"),
-            recent_events=entity_data.get("recent_events")
+            recent_events=entity_data.get("recent_events"),
+            action_schema=action_data
         )
 
         _LOGGER.debug(f"Sending formatted prompt to Gemini: {formatted_prompt[:500]}...")
