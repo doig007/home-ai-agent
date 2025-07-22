@@ -102,11 +102,11 @@ class GeminiClient:
         entity_data = json.loads(entity_data_json or '{}')
 
         formatted_prompt = prompt.format(
-            long_term_stats=entity_data.get("long_term_stats", {}),
-            recent_events=entity_data.get("recent_events", {})
+            long_term_stats=entity_data.get("long_term_stats"),
+            recent_events=entity_data.get("recent_events")
         )
 
-        _LOGGER.debug(f"Sending formatted prompt to Gemini: {formatted_prompt[:1000]}...")
+        _LOGGER.debug(f"Sending formatted prompt to Gemini: {formatted_prompt[:500]}...")
 
         try:
             _LOGGER.error("FORMATTED PROMPT:\n%s", formatted_prompt)
