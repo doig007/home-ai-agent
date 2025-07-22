@@ -96,7 +96,6 @@ class GeminiClient:
 
     def get_insights(self, prompt: str, entity_data_json: str) -> dict | None:
         """Get insights from the Gemini API using the chat session for context."""
-        _LOGGER.debug(f"Sending prompt to Gemini: {prompt[:500]}...")
 
         gen_config_obj = genai_types.GenerationConfig(**BASE_GENERATION_CONFIG_PARAMS)
 
@@ -106,6 +105,8 @@ class GeminiClient:
             long_term_stats=entity_data.get("long_term_stats", {}),
             recent_events=entity_data.get("recent_events", {})
         )
+
+        _LOGGER.debug(f"Sending formatted prompt to Gemini: {formatted_prompt[:1000]}...")
 
         try:
             _LOGGER.error("FORMATTED PROMPT:\n%s", formatted_prompt)
