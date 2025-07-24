@@ -157,7 +157,7 @@ Recent raw events (last 6 h):
 Provide:
 1. Concise insights based on observed trends.
 2. Alerts if anything looks unusual.
-3. Recommended actions.
+3. Recommended Home Assistant service calls to execute, including the confidence level (between 0 and 100 percent) for those actions.
 
 Respond extremely briefly, suitable for a phone notification.
 
@@ -213,7 +213,7 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                             _LOGGER.warning("Skipping malformed action (missing domain/service): %s", call)
                             continue
 
-                        await hass.services.async_call(domain, service, service_data, blocking=False)
+                        await hass.services.async_call(domain, service, service_data, blocking=False) 
                         _LOGGER.debug("Executed Gemini-requested action: %s", call)
                     except Exception as e:
                         _LOGGER.error("Failed to execute action %s - %s", call, e)
@@ -229,10 +229,10 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                 return insights
             else:
                 _LOGGER.error("Failed to get insights from Gemini.")
-                return {"insights": "Error", "alerts": "Error", "actions": "Error", "raw_text": "Failed to get insights"}
+                return {"insights": "Error", "alerts": "Error", "to_execute": "Error", "raw_text": "Failed to get insights"}
         except Exception as e:
             _LOGGER.error(f"Exception during Gemini API call in coordinator: {e}")
-            return {"insights": f"Exception: {e}", "alerts": "Exception", "actions": "Exception", "raw_text": f"Exception: {e}"}
+            return {"insights": f"Exception: {e}", "alerts": "Exception", "to_execute": "Exception", "raw_text": f"Exception: {e}"}
 
     coordinator = DataUpdateCoordinator(
         hass,
@@ -247,7 +247,7 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
     sensors = [
         GeminiInsightsSensor(coordinator, "Insights"),
         GeminiInsightsSensor(coordinator, "Alerts"),
-        GeminiInsightsSensor(coordinator, "Actions"),
+        GeminiInsightsSensor(coordinator, "To Execute"),
         GeminiRawTextSensor(coordinator),
     ]
     async_add_entities(sensors)

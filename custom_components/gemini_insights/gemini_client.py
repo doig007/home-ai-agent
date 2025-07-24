@@ -39,13 +39,12 @@ BASE_GENERATION_CONFIG_PARAMS = {
 
 GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
     name="generate_insights",
-    description="Generates insights, alerts, actions, and (optionally) any service calls to execute.",
+    description="Generates insights, alerts, and any service calls to execute.",
     parameters={
         "type": "object",
         "properties": {
             "insights":  {"type": "string"},
             "alerts":    {"type": "string"},
-            "actions":   {"type": "string"},
             "to_execute": {
                 "type": "array",
                 "items": {
@@ -54,12 +53,13 @@ GENERATE_INSIGHTS_FUNCTION_DECLARATION = genai_types.FunctionDeclaration(
                         "domain": {"type": "string"},
                         "service": {"type": "string"},
                         "service_data": {"type": "object"},
+                        "confidence": { "type": "number", "description": "Confidence level of the action" },
                     },
                     "required": ["domain", "service", "service_data"],
                 },
             },
         },
-        "required": ["insights", "alerts", "actions"],
+        "required": ["insights", "alerts", "to_execute"],
     },
 )
 
@@ -111,8 +111,6 @@ class GeminiClient:
         _LOGGER.debug(f"Sending formatted prompt to Gemini: {formatted_prompt[:500]}...")
 
         try:
-            _LOGGER.error("FORMATTED PROMPT:\n%s", formatted_prompt)
-
             # Use the chat session to send the message, maintaining context
             response = self._chat_session.send_message(
                 content=formatted_prompt,
