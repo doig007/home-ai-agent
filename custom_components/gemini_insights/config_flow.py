@@ -88,15 +88,10 @@ class GeminiInsightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
-        """Get the options flow for this handler."""
-        return GeminiInsightsOptionsFlowHandler(config_entry)
+        return GeminiInsightsOptionsFlowHandler()
 
 class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow using domain/area check-boxes."""
-
-    #def __init__(self, config_entry: config_entries.ConfigEntry):
-        # self.config_entry = config_entry  # Removed because of new HA warning
-        
+    """Options flow using domain/area check-boxes."""      
 
     async def async_step_init(self, user_input=None):
         """Manage options with category check-boxes."""
