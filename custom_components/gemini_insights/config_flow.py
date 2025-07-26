@@ -148,7 +148,7 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.SelectSelectorConfig(
                         options=domains,
                         multiple=True,
-                        mode=selector.SelectSelectorMode.CHECKBOX,
+                        mode=selector.SelectSelectorMode.DROPDOWN,  # instead of CHECKBOX
                     ),
                 ),
                 vol.Optional(
@@ -158,7 +158,7 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.SelectSelectorConfig(
                         options=areas,
                         multiple=True,
-                        mode=selector.SelectSelectorMode.CHECKBOX,
+                        mode=selector.SelectSelectorMode.DROPDOWN,  # instead of CHECKBOX
                     ),
                 ),
                 vol.Required(
