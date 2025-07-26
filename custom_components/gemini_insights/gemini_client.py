@@ -20,7 +20,7 @@ SAFETY = {
 
 GEN_CFG = t.GenerateContentConfig(
     temperature=0.9,
-    max_output_tokens=2048,
+    max_output_tokens=4096,
     response_mime_type="application/json",
     response_schema={
         "type": "object",
