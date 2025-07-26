@@ -5,6 +5,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_API_KEY
+from homeassistant.exceptions import ConfigEntryNotReady
 
 from google import genai
 from google.genai import types as t
@@ -25,13 +26,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api_key = entry.data[CONF_API_KEY]
 
     hass.data.setdefault(DOMAIN, {})
-    
-    # store the entry object itself – it already has .data and .options
-    hass.data[DOMAIN][entry.entry_id] = {"entry": entry}
+    hass.data[DOMAIN][entry.entry_id] = {"entry": entry}    # store the entry object itself
 
-    # Set up the coordinator
-    # The coordinator will be responsible for fetching data from Home Assistant
-    # and calling the Gemini API.
+    # validate the key early
+    try:
+        await GeminiClient.async_create(hass, entry.data[CONF_API_KEY])
+    except Exception as exc:
+        raise ConfigEntryNotReady(str(exc)) from exc
+
+    # === Set up the coordinator ===
+    # The coordinator will be responsible for fetching data from Home Assistant and calling the Gemini API.
 
     # Add an options update listener
     entry.async_on_unload(entry.add_update_listener(async_update_options_listener))
@@ -39,7 +43,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward the setup to platforms.
     # This will allow us to create sensor entities to display the insights.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     return True
 
 

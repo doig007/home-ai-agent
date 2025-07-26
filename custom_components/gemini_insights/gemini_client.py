@@ -60,20 +60,8 @@ class GeminiClient:
         if not api_key:
             raise ValueError("API key missing")
 
-        client = genai.Client(
-            vertexai=False,
-            api_key=api_key,
-            http_options=t.HttpOptions(api_version="v1beta"),
-        )
-
-        # Verify key with a tiny test call
         try:
-            await hass.async_add_executor_job(
-                client.models.generate_content,
-                model="gemini-1.5-flash",
-                contents=["ping"],
-                config=t.GenerateContentConfig(max_output_tokens=1),
-            )
+            client = await hass.async_add_executor_job(_build_client, api_key)
         except Exception as exc:
             _LOGGER.error("Gemini key test failed: %s", exc)
             raise ValueError("Invalid or unauthorized Gemini API key") from exc
@@ -104,3 +92,22 @@ class GeminiClient:
         except Exception as exc:
             _LOGGER.exception("Gemini call failed")
             return None
+        
+
+def _build_client(api_key: str):
+    """Blocking helper: create client and do a tiny call."""
+    import google.genai as genai
+    from google.genai import types as t
+
+    client = genai.Client(
+        vertexai=False,
+        api_key=api_key,
+        http_options=t.HttpOptions(api_version="v1beta"),
+    )
+    # quick smoke test
+    client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=["ping"],
+        config=t.GenerateContentConfig(max_output_tokens=1),
+    )
+    return client
