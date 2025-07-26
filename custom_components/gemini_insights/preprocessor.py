@@ -131,6 +131,8 @@ class Preprocessor:
         # Build the filtered list in the event loop (tiny, safe)
         actions = []
         for dom, srvs in services.items():
+            if dom == "persistent_notification":
+                continue  # Skip persistent_notification domain
             for srv, desc in srvs.items():
                 if srv in {"reload", "remove", "update", "resttart", "stop"}:
                     continue
