@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_API_KEY
 
 from google import genai
+from google.genai import types as t
 
 from .const import DOMAIN
 
@@ -28,9 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "client": genai.Client(
             vertexai=False,        # we use the Developer API, not Vertex
             api_key=api_key,
-            http_options=genai.HttpOptions(
-                api_version="v1beta",  # use v1 once it is GA
-            ),
+            http_options=t.HttpOptions(api_version="v1beta"),
         )
     }
 
