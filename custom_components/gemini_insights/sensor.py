@@ -36,18 +36,10 @@ from homeassistant.util import dt as dt_util # For timezone aware datetime objec
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the sensor platform."""
-    entry_store = hass.data[DOMAIN][entry.entry_id]
-    entry_obj   = entry_store["entry"]
-    config      = entry_obj.data
-    options     = entry_obj.options
-
-    api_key = config.get(CONF_API_KEY) 
+    entry_obj = hass.data[DOMAIN][entry.entry_id]["entry"]
+    api_key = entry_obj.data[CONF_API_KEY]
 
     if not api_key:
         _LOGGER.error("Gemini API key not found in configuration.")
@@ -60,9 +52,14 @@ async def async_setup_entry(
         _LOGGER.error(f"Failed to initialize Gemini Client: {e}")
         # Raising ConfigEntryNotReady will cause Home Assistant to retry the setup later.
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
-    
+
     # === COORDINATOR SETUP ===
-    update_interval_seconds = options.get(CONF_UPDATE_INTERVAL, config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL))
+    config  = entry_obj.data
+    options = entry_obj.options
+    update_interval_seconds = options.get(
+        CONF_UPDATE_INTERVAL,
+        config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+    )
 
     async def async_update_data():
         """Fetch data from Home Assistant, send to Gemini, and return insights."""

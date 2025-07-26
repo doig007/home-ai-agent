@@ -70,9 +70,9 @@ class GeminiClient:
         try:
             await hass.async_add_executor_job(
                 client.models.generate_content,
-                "gemini-1.5-flash",
-                ["ping"],
-                t.GenerateContentConfig(max_output_tokens=1),
+                model="gemini-1.5-flash",
+                contents=["ping"],
+                config=t.GenerateContentConfig(max_output_tokens=1),
             )
         except Exception as exc:
             _LOGGER.error("Gemini key test failed: %s", exc)
