@@ -34,12 +34,7 @@ GEN_CFG = t.GenerateContentConfig(
                     "properties": {
                         "domain":       {"type": "string"},
                         "service":      {"type": "string"},
-                        "service_data": {
-                            "type": "object",
-                            "properties": {
-                                "payload": {"type": "object"}   # dummy placeholder
-                            }
-                        }
+                        "service_data": {"type": "string"},
                     },
                     "required": ["domain", "service", "service_data"],
                 },

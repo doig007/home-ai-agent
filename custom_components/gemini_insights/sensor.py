@@ -1,5 +1,6 @@
 """Sensor platform for Gemini Insights."""
 import logging
+import json
 from datetime import timedelta
 
 from homeassistant.components.sensor import SensorEntity
@@ -204,7 +205,7 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                     try:
                         domain  = call.get("domain")
                         service = call.get("service")
-                        service_data = call.get("service_data", {})
+                        service_data = json.loads(call.get("service_data"))
                         if not all(isinstance(x, str) for x in (domain, service)):
                             _LOGGER.warning("Skipping malformed action (missing domain/service): %s", call)
                             continue
