@@ -4,8 +4,13 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_API_KEY
+
+from google import genai
 
 from .const import DOMAIN
+
+from .gemini_client import GeminiClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,13 +19,19 @@ PLATFORMS = ["sensor"]  # Example: if you're creating sensor entities
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Gemini Insights from a config entry."""
+    
+    # Store the client in hass.data so platforms can share it
+    api_key = entry.data[CONF_API_KEY]
+
     hass.data.setdefault(DOMAIN, {})
-    # Store the config entry data and options in hass.data
-    # Options will be updated by the options flow listener
     hass.data[DOMAIN][entry.entry_id] = {
-        "config": dict(entry.data),
-        "options": dict(entry.options),
+        "client": genai.Client(
+            vertexai=False,        # we use the Developer API, not Vertex
+            api_key=api_key,
+            http_options=genai.HttpOptions(
+                api_version="v1beta",  # use v1 once it is GA
+            ),
+        )
     }
 
     # Set up the coordinator

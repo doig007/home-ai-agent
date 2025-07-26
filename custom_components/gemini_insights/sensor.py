@@ -26,6 +26,9 @@ from .const import (
     HISTORY_PERIOD_TIMEDELTA_MAP,
 )
 from .gemini_client import GeminiClient
+
+
+
 from .preprocessor import Preprocessor
 from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
 from homeassistant.util import dt as dt_util # For timezone aware datetime objects
@@ -196,9 +199,10 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                 )
             )
 
-            insights = await hass.async_add_executor_job(
-                gemini_client.get_insights, prompt_template, entity_data_json, action_schema
+            insights = await gemini_client.get_insights(
+                prompt_template, entity_data_json, action_schema
             )
+            
             if insights:
                 _LOGGER.debug(f"Received insights from Gemini: {insights.get('insights')}")
 
