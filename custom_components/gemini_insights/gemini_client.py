@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-MODEL = "gemini-1.5-flash"
+MODEL = "gemini-2.5-flash"
 SAFETY = {
     "HARASSMENT":          "BLOCK_MEDIUM_AND_ABOVE",
     "HATE_SPEECH":         "BLOCK_MEDIUM_AND_ABOVE",
@@ -19,7 +19,7 @@ SAFETY = {
 }
 
 GEN_CFG = t.GenerateContentConfig(
-    temperature=0.0,
+    temperature=0.9,
     max_output_tokens=2048,
     response_mime_type="application/json",
     response_schema={
@@ -27,7 +27,6 @@ GEN_CFG = t.GenerateContentConfig(
         "properties": {
             "insights": {"type": "string"},
             "alerts":   {"type": "string"},
-            "actions":  {"type": "string"},
             "to_execute": {
                 "type": "array",
                 "items": {
@@ -35,13 +34,17 @@ GEN_CFG = t.GenerateContentConfig(
                     "properties": {
                         "domain":       {"type": "string"},
                         "service":      {"type": "string"},
-                        "service_data": {"type": "object"},
+                        "service_data": {
+                            "type": "object",
+                            "properties": {}, # This will be filled in by the user
+                            "additionalProperties": True
+                        },
                     },
                     "required": ["domain", "service", "service_data"],
                 },
             },
         },
-        "required": ["insights", "alerts", "actions"],
+        "required": ["insights", "alerts"],
     },
 )
 
@@ -106,7 +109,7 @@ def _build_client(api_key: str):
     )
     # quick smoke test
     client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash",
         contents=["ping"],
         config=t.GenerateContentConfig(max_output_tokens=1),
     )
