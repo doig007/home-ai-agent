@@ -42,9 +42,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    domain_data = hass.data[DOMAIN][entry.entry_id]
-    config = domain_data["config"]
-    options = domain_data["options"]
+    entry_store = hass.data[DOMAIN][entry.entry_id]
+    entry_obj   = entry_store["entry"]
+    config      = entry_obj.data
+    options     = entry_obj.options
 
     api_key = config.get(CONF_API_KEY) 
 
@@ -59,12 +60,6 @@ async def async_setup_entry(
         _LOGGER.error(f"Failed to initialize Gemini Client: {e}")
         # Raising ConfigEntryNotReady will cause Home Assistant to retry the setup later.
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
-
-    # now safe to forward
-    # await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS) # Removed 23:27 21/7/25
-
-    # store the client where the coordinator will pick it up later
-    domain_data["gemini_client"] = gemini_client
     
     # === COORDINATOR SETUP ===
     update_interval_seconds = options.get(CONF_UPDATE_INTERVAL, config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL))

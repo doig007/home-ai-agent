@@ -20,18 +20,14 @@ PLATFORMS = ["sensor"]  # Example: if you're creating sensor entities
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    
+    """Set up Gemini Insights from a config entry."""
     # Store the client in hass.data so platforms can share it
     api_key = entry.data[CONF_API_KEY]
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        "client": genai.Client(
-            vertexai=False,        # we use the Developer API, not Vertex
-            api_key=api_key,
-            http_options=t.HttpOptions(api_version="v1beta"),
-        )
-    }
+    
+    # store the entry object itself – it already has .data and .options
+    hass.data[DOMAIN][entry.entry_id] = {"entry": entry}
 
     # Set up the coordinator
     # The coordinator will be responsible for fetching data from Home Assistant
