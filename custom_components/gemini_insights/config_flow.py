@@ -94,8 +94,9 @@ class GeminiInsightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
     """Options flow using domain/area check-boxes."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry):
-        self.config_entry = config_entry
+    #def __init__(self, config_entry: config_entries.ConfigEntry):
+        # self.config_entry = config_entry  # Removed because of new HA warning
+        
 
     async def async_step_init(self, user_input=None):
         """Manage options with category check-boxes."""
@@ -128,11 +129,19 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
         current_entities = self.config_entry.options.get(
             CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, [])
         )
-        current_domains = {e.split(".")[0] for e in current_entities}
+        # Build the list of currently selected domains / areas safely
+        ent_reg = entity_registry.async_get(self.hass)
+        area_reg = area_registry.async_get(self.hass)
+
+        current_domains = {
+            e.split(".", 1)[0]
+            for e in current_entities
+            if e in ent_reg.entities
+        }
         current_areas = {
             area_reg.areas.get(ent_reg.entities[e].area_id, {}).name
             for e in current_entities
-            if ent_reg.entities[e].area_id
+            if e in ent_reg.entities and ent_reg.entities[e].area_id
         }
 
         schema = vol.Schema(
