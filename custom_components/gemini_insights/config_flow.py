@@ -1,17 +1,21 @@
 """Config flow for Gemini Insights."""
 import logging
+import fnmatch
+from typing import Any, Dict, List
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.const import CONF_API_KEY
-from homeassistant.helpers import selector
+from homeassistant.helpers import selector, entity_registry, area_registry
 
 from .const import (
     DOMAIN,
     CONF_PROMPT,
     CONF_ENTITIES,
     CONF_UPDATE_INTERVAL,
+    CONF_DOMAINS,
+    CONF_AREAS,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
     CONF_HISTORY_PERIOD,
@@ -87,88 +91,107 @@ class GeminiInsightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Get the options flow for this handler."""
         return GeminiInsightsOptionsFlowHandler(config_entry)
 
-
 class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle an options flow for Gemini Insights."""
+    """Options flow using domain/area check-boxes."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
-        """Initialize options flow."""
         self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
-        """Manage the options."""
+        """Manage options with category check-boxes."""
         errors = {}
+
+        # Build dynamic domain list from registry
+        ent_reg = entity_registry.async_get(self.hass)
+        domains = sorted({eid.split(".")[0] for eid in ent_reg.entities})
+
+        # Build area list
+        area_reg = area_registry.async_get(self.hass)
+        areas = sorted({area.name for area in area_reg.areas.values()})
+
         if user_input is not None:
-            # You could add validation for options here if needed
+            # Resolve selections → final entity list
+            selected_entities = []
+            selected_domains = user_input.get(CONF_DOMAINS, [])
+            selected_areas = user_input.get(CONF_AREAS, [])
+
+            for eid, entity in ent_reg.entities.items():
+                domain_ok = entity.domain in selected_domains
+                area_ok = entity.area_id and area_reg.areas.get(entity.area_id, {}).name in selected_areas
+                if domain_ok or area_ok:
+                    selected_entities.append(eid)
+
+            user_input[CONF_ENTITIES] = selected_entities
             return self.async_create_entry(title="", data=user_input)
 
-        # Get current or default values
-        current_api_key = self.config_entry.data.get(CONF_API_KEY, "") # Should not be changed here ideally
+        # Current/previous values
         current_entities = self.config_entry.options.get(
             CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, [])
         )
-        current_prompt = self.config_entry.options.get(
-            CONF_PROMPT, self.config_entry.data.get(CONF_PROMPT, DEFAULT_PROMPT)
-        )
-        current_update_interval = self.config_entry.options.get(
-            CONF_UPDATE_INTERVAL, self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-        )
-        current_history_period = self.config_entry.options.get(
-            CONF_HISTORY_PERIOD, self.config_entry.data.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD)
-        )
+        current_domains = {e.split(".")[0] for e in current_entities}
+        current_areas = {
+            area_reg.areas.get(ent_reg.entities[e].area_id, {}).name
+            for e in current_entities
+            if ent_reg.entities[e].area_id
+        }
 
-        history_period_options = [
-            HISTORY_LATEST_ONLY,
-            HISTORY_1_HOUR,
-            HISTORY_6_HOURS,
-            HISTORY_12_HOURS,
-            HISTORY_24_HOURS,
-            HISTORY_3_DAYS,
-            HISTORY_7_DAYS,
-        ]
-
-
-        options_schema = vol.Schema(
+        schema = vol.Schema(
             {
-                vol.Required(
-                    CONF_ENTITIES, default=current_entities
-                ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
+                vol.Optional(
+                    CONF_DOMAINS,
+                    default=list(current_domains)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=domains,
                         multiple=True,
-                        filter={
-                            "domain": [
-                                "sensor",
-                                "binary_sensor",
-                                "switch",
-                                "light",
-                                "climate",
-                                "weather",
-                                "person",
-                                "device_tracker"
-                            ]
-                        }
-                    )
+                        mode=selector.SelectSelectorMode.CHECKBOX,
+                    ),
+                ),
+                vol.Optional(
+                    CONF_AREAS,
+                    default=list(current_areas)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=areas,
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.CHECKBOX,
+                    ),
                 ),
                 vol.Required(
-                    CONF_PROMPT, default=current_prompt
+                    CONF_PROMPT,
+                    default=self.config_entry.options.get(
+                        CONF_PROMPT,
+                        self.config_entry.data.get(CONF_PROMPT, DEFAULT_PROMPT)
+                    ),
                 ): selector.TextSelector(
                     selector.TextSelectorConfig(
                         multiline=True,
                         type=selector.TextSelectorType.TEXT,
-                        suffix="Configure the prompt template for Gemini"
                     )
                 ),
                 vol.Required(
-                    CONF_UPDATE_INTERVAL, default=current_update_interval
+                    CONF_UPDATE_INTERVAL,
+                    default=self.config_entry.options.get(
+                        CONF_UPDATE_INTERVAL,
+                        self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+                    ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)),
                 vol.Required(
-                    CONF_HISTORY_PERIOD, default=current_history_period
-                ): vol.In(history_period_options),
+                    CONF_HISTORY_PERIOD,
+                    default=self.config_entry.options.get(
+                        CONF_HISTORY_PERIOD,
+                        self.config_entry.data.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD)
+                    ),
+                ): vol.In([
+                    HISTORY_LATEST_ONLY,
+                    HISTORY_1_HOUR,
+                    HISTORY_6_HOURS,
+                    HISTORY_12_HOURS,
+                    HISTORY_24_HOURS,
+                    HISTORY_3_DAYS,
+                    HISTORY_7_DAYS,
+                ]),
             }
         )
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=options_schema,
-            errors=errors,
-        )
+        return self.async_show_form(step_id="init", data_schema=schema)

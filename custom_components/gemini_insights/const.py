@@ -4,6 +4,8 @@ DOMAIN = "gemini_insights"
 CONF_API_KEY = "api_key"
 CONF_PROMPT = "prompt"
 CONF_ENTITIES = "entities"
+CONF_DOMAINS = "domains"
+CONF_AREAS   = "areas"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HISTORY_PERIOD = "history_period"
 
