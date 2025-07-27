@@ -120,11 +120,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         
         # 2. Build the final prompt
         final_prompt = prompt_template.format(
-            entity_data = entity_data_json,
-            action_schema = action_schema_json
+            entity_data=entity_data_json,
+            action_schema=action_schema_json
         )
-        action_schema = await preprocessor.async_get_action_schema() # Assuming preprocessor has this method
-
+        
 
         prompt_size = len(final_prompt.encode('utf-8'))
         if prompt_size > 30000:
