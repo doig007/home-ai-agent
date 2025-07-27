@@ -16,6 +16,8 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_DOMAINS,
     CONF_AREAS,
+    CONF_INCLUDE_PATTERNS,
+    CONF_EXCLUDE_PATTERNS,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
     CONF_HISTORY_PERIOD,
@@ -107,9 +109,12 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
         area_reg = area_registry.async_get(self.hass)
         areas = sorted({area.name for area in area_reg.areas.values()})
 
+        # Resolve selections → final entity list
         if user_input is not None:
-            # Resolve selections → final entity list
-            selected_entities = []
+            
+            selected_entities = set()
+
+            # Start with entities from selected domains and areas            
             selected_domains = user_input.get(CONF_DOMAINS, [])
             selected_areas = user_input.get(CONF_AREAS, [])
 
@@ -119,22 +124,33 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 if domain_ok or area_ok:
                     selected_entities.append(eid)
 
+            # Add entries matching include patterns (supports wildcards) 
+            include_patterns_str = user_input.get(CONF_INCLUDE_PATTERNS, "")
+            if include_patterns_str:
+                all_entity_ids = ent_reg.entities.keys()
+                for pattern in [p.strip() for p in include_patterns_str.split(',') if p.strip()]:
+                    selected_entities.update(fnmatch.filter(all_entity_ids, pattern))
+
+            # Remove entities matching exclude patterns (supports wildcards)
+            exclude_patterns_str = user_input.get(CONF_EXCLUDE_PATTERNS, "")
+            if exclude_patterns_str:
+                entities_to_remove = set()
+                for pattern in [p.strip() for p in exclude_patterns_str.split(',') if p.strip()]:
+                    entities_to_remove.update(fnmatch.filter(selected_entities, pattern))
+                selected_entities -= entities_to_remove
+
             user_input[CONF_ENTITIES] = selected_entities
             return self.async_create_entry(title="", data=user_input)
 
         # Current/previous values
-        current_entities = self.config_entry.options.get(
-            CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, [])
-        )
+        current_config = self.config_entry.options
+        current_entities = current_config.get(CONF_ENTITIES, [])
+
         # Build the list of currently selected domains / areas safely
         ent_reg = entity_registry.async_get(self.hass)
         area_reg = area_registry.async_get(self.hass)
 
-        current_domains = {
-            e.split(".", 1)[0]
-            for e in current_entities
-            if e in ent_reg.entities
-        }
+        current_domains = {e.split(".", 1)[0] for e in current_entities if e in ent_reg.entities}
         current_areas = {
             area_reg.areas.get(ent_reg.entities[e].area_id, {}).name
             for e in current_entities
@@ -150,7 +166,8 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.SelectSelectorConfig(
                         options=domains,
                         multiple=True,
-                        mode=selector.SelectSelectorMode.DROPDOWN,  # instead of CHECKBOX
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=False
                     ),
                 ),
                 vol.Optional(
@@ -160,8 +177,21 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.SelectSelectorConfig(
                         options=areas,
                         multiple=True,
-                        mode=selector.SelectSelectorMode.DROPDOWN,  # instead of CHECKBOX
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=False
                     ),
+                ),
+                vol.Optional(
+                    CONF_INCLUDE_PATTERNS,
+                    default=current_config.get(CONF_INCLUDE_PATTERNS, "")
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+                ),
+                vol.Optional(
+                    CONF_EXCLUDE_PATTERNS,
+                    default=current_config.get(CONF_EXCLUDE_PATTERNS, "")
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
                 ),
                 vol.Required(
                     CONF_PROMPT,
