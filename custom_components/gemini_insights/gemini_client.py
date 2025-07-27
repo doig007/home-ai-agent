@@ -70,29 +70,23 @@ class GeminiClient:
 
     async def get_insights(
         self,
-        prompt_template: str,
-        entity_data_json: str,
-        action_schema: str,
+        final_prompt: str,
     ) -> Optional[Dict[str, Any]]:
-        """Return parsed JSON from Gemini."""
-        entity_data = json.loads(entity_data_json or "{}")
-        final_prompt = prompt_template.format(
-            long_term_stats=entity_data.get("long_term_stats"),
-            recent_events=entity_data.get("recent_events"),
-            action_schema=json.loads(action_schema or "[]"),
-        )
+        """Return parsed JSON from Gemini using a fully-formed prompt."""
 
         try:
-            response = await self._client.aio.models.generate_content(
+            response = await self._client.generate_content_async(
                 model=MODEL,
                 contents=[final_prompt],
-                config=GEN_CFG,
+                generation_config=GEN_CFG,
+                safety_settings=SAFETY,
             )
+            # The response.text should already be a JSON string due to response_mime_type
             return json.loads(response.text)
-        except Exception as exc:
-            _LOGGER.exception("Gemini call failed")
+        except Exception:
+            _LOGGER.exception("Gemini API call failed")
             return None
-        
+
 
 def _build_client(api_key: str):
     """Blocking helper: create client and do a tiny call."""

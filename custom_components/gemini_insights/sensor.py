@@ -1,7 +1,7 @@
 """Sensor platform for Gemini Insights."""
 import logging
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,6 +12,10 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.history import get_significant_states
+from homeassistant.components.recorder.statistics import statistics_during_period
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -29,12 +33,7 @@ from .const import (
     CONF_ACTION_CONFIDENCE_THRESHOLD,
 )
 from .gemini_client import GeminiClient
-
-
-
 from .preprocessor import Preprocessor
-from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
-from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,8 +56,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
 
     # === COORDINATOR SETUP ===
-    config  = entry_obj.data
-    options = entry_obj.options
+    config  = entry.data
+    options = entry.options
     update_interval_seconds = options.get(
         CONF_UPDATE_INTERVAL,
         config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
@@ -68,113 +67,73 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         """Fetch data from Home Assistant, send to Gemini, and return insights."""
         _LOGGER.debug("Coordinator update called")
         
-        entity_ids = options.get(CONF_ENTITIES, config.get(CONF_ENTITIES, []))
+        entity_ids = options.get(CONF_ENTITIES, [])
+        prompt_template = options.get(CONF_PROMPT, DEFAULT_PROMPT)
+        history_period_key = options.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD)
         auto_execute = options.get(CONF_AUTO_EXECUTE_ACTIONS, False)
         confidence_threshold = options.get(CONF_ACTION_CONFIDENCE_THRESHOLD, 0.7)
-        prompt_template = options.get(CONF_PROMPT, config.get(CONF_PROMPT, DEFAULT_PROMPT))
-        history_period_key = options.get(CONF_HISTORY_PERIOD, config.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD))
 
         if not entity_ids:
             _LOGGER.info("No entities configured for Gemini Insights. Skipping API call.")
             return {"insights": "No entities configured.", "alerts": "", "actions": "", "raw_text": "No entities configured."}
 
-        entity_data_map = {}
+        # === START OF REFACTORED DATA FETCHING AND PROCESSING ===
+        preprocessor = Preprocessor(hass, entity_ids)
         now = dt_util.utcnow()
+        entity_data_json = "{}"
 
-        for entity_id in entity_ids:
-            if history_period_key == HISTORY_LATEST_ONLY:
-                state = hass.states.get(entity_id)
-                if state:
-                    entity_data_map[entity_id] = {
-                        "current_state": {
-                            "state": state.state,
-                            "attributes": dict(state.attributes),
-                            "last_changed": state.last_changed.isoformat() if state.last_changed else None,
-                            "last_updated": state.last_updated.isoformat() if state.last_updated else None,
-                        }
-                    }
-                else:
-                    entity_data_map[entity_id] = {"current_state": None}
-                    _LOGGER.warning(f"Entity {entity_id} not found for current state.")
-            else:
-                timedelta_params = HISTORY_PERIOD_TIMEDELTA_MAP.get(history_period_key)
-                if timedelta_params:
-                    start_time = now - timedelta(**timedelta_params)
-                    history_states_response = await hass.async_add_executor_job(
-                        get_significant_states,
-                        hass, start_time, None, [entity_id],
-                        None, True, False
-                    )
-                    
-                    historical_states_data = []
-                    if entity_id in history_states_response and history_states_response[entity_id]:
-                        for s in history_states_response[entity_id]:
-                            historical_states_data.append({
-                                "state": s.state,
-                                "attributes": dict(s.attributes),
-                                "last_changed": s.last_changed.isoformat(),
-                                "last_updated": s.last_updated.isoformat(),
-                            })
-                    entity_data_map[entity_id] = {"historical_states": historical_states_data}
-                    if not historical_states_data:
-                        current_state_val = hass.states.get(entity_id)
-                        if current_state_val:
-                             entity_data_map[entity_id]["current_state"] = {
-                                "state": current_state_val.state,
-                                "attributes": dict(current_state_val.attributes),
-                                "last_changed": current_state_val.last_changed.isoformat(),
-                                "last_updated": current_state_val.last_updated.isoformat(),
-                            }
-                else:
-                    _LOGGER.warning(f"Unknown history period key: {history_period_key}. Falling back to latest.")
-                    state = hass.states.get(entity_id)
-                    if state:
-                         entity_data_map[entity_id] = {
-                            "current_state": { "state": state.state, "attributes": dict(state.attributes) }
-                         }
+        # 1a. Fetch data based on user's history preference
+        if history_period_key == HISTORY_LATEST_ONLY:
+            entity_data_json = await preprocessor.async_get_compact_latest_states_json()
+        else:
+            # Fetch both historical states and long-term stats for other periods
+            timedelta_params = HISTORY_PERIOD_TIMEDELTA_MAP.get(history_period_key)
+            if timedelta_params:
+                start_time_history = now - timedelta(**timedelta_params)
+                
+                # Fetch recent events (now returns compact data)
+                history_states_response = await get_instance(hass).async_add_executor_job(
+                    get_significant_states,
+                    hass, start_time_history, None, entity_ids,
+                    include_start_time_state=True, minimal_response=True # Use minimal_response
+                )
+                recent_events_json = await preprocessor.async_get_compact_recent_events_json(history_states_response)
 
-        preprocessor = Preprocessor(hass, entity_ids)
-        entity_data_json = await preprocessor.async_get_entity_data_json()
+                # Fetch long-term stats (only for numeric entities)
+                start_time_stats = now - timedelta(days=1)
+                numeric_entity_ids = [eid for eid in entity_ids if preprocessor._is_numeric_entity(eid)]
+                stats_response = await get_instance(hass).async_add_executor_job(
+                    statistics_during_period,
+                    hass, start_time_stats, None, numeric_entity_ids, "5minute", None, {"mean"}
+                )
+                long_term_stats_json = await preprocessor.async_get_compact_long_term_stats_json(stats_response)
 
-        # ------------------------------------------------------------------
-        # Build the new prompt
-        # ------------------------------------------------------------------
-        preprocessor = Preprocessor(hass, entity_ids)
-        entity_data_json = await preprocessor.async_get_entity_data_json()
+                # Combine them into a single JSON object string for the prompt
+                combined_payload = {
+                    "recent_events": json.loads(recent_events_json),
+                    "long_term_stats": json.loads(long_term_stats_json)
+                }
+                entity_data_json = json.dumps(combined_payload)
 
-        # New prompt template – can be overriden in options
-        prompt_template = options.get(
-            CONF_PROMPT,
-            """
-Home Assistant data for the family home.
-
-Long-term averages (48 half-hour slots for last day):
-{long_term_stats}
-
-Recent raw events (last 6 h):
-{recent_events}
-
-Provide:
-1. Concise insights based on observed trends.
-2. Alerts if anything looks unusual.
-3. Recommended Home Assistant service calls to execute, including the confidence level (between 0 and 100 percent) for those actions.
-
-Respond extremely briefly, suitable for a phone notification.
-
-Here is the complete list of Home-Assistant service calls you are allowed to use:
-{action_schema}
-
-""",
+        # 1b. Get the action schema from Home Assistant.
+        action_schema_json = await preprocessor.async_get_action_schema()
+        
+        # 2. Build the final prompt
+        final_prompt = prompt_template.format(
+            entity_data = entity_data_json,
+            action_schema = action_schema_json
         )
+        action_schema = await preprocessor.async_get_action_schema() # Assuming preprocessor has this method
 
-        # Get the action schema from Home Assistant and append to the prompt template
-        action_schema = await preprocessor.async_get_action_schema()
 
-        if len(entity_data_json) > 100000:
-            _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
-
-        if len(entity_data_json) > 100000:
-            _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
+        prompt_size = len(final_prompt.encode('utf-8'))
+        if prompt_size > 30000:
+            _LOGGER.warning(
+                "The final prompt for Gemini is very large (%s bytes). "
+                "This may lead to errors or high costs. "
+                "Consider reducing entities or history period.",
+                prompt_size
+            )
 
         try:
             import functools, pathlib, time
@@ -196,9 +155,8 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                 )
             )
 
-            insights = await gemini_client.get_insights(
-                prompt_template, entity_data_json, action_schema
-            )
+            # Call the simplified Gemini client with the complete prompt
+            insights = await gemini_client.get_insights(final_prompt)
             
             if insights:
                 _LOGGER.debug(f"Received insights from Gemini: {insights.get('insights')}")
@@ -241,10 +199,10 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                 return insights
             else:
                 _LOGGER.error("Failed to get insights from Gemini.")
-                return {"insights": "Error", "alerts": "Error", "to_execute": "Error", "raw_text": "Failed to get insights"}
+                return {"insights": "Error", "alerts": "Error", "to_execute": [], "raw_text": "Failed to get insights"}
         except Exception as e:
             _LOGGER.error(f"Exception during Gemini API call in coordinator: {e}")
-            return {"insights": f"Exception: {e}", "alerts": "Exception", "to_execute": "Exception", "raw_text": f"Exception: {e}"}
+            return {"insights": f"Exception: {e}", "alerts": "Exception", "to_execute": [], "raw_text": f"Exception: {e}"}
 
     coordinator = DataUpdateCoordinator(
         hass,

@@ -35,21 +35,26 @@ HISTORY_PERIOD_TIMEDELTA_MAP = {
     HISTORY_7_DAYS: {"days": 7},
 }
 
+DEFAULT_UPDATE_INTERVAL = 1800  # seconds (30 minutes)
 
 DEFAULT_PROMPT = """
-Home Assistant data for the family home.
+Analyze the following Home Assistant data, which is provided as a JSON object.
+Data:
+{entity_data}
 
-Long-term averages (48 half-hour slots for last day):
-{long_term_stats}
+Based on the data, provide:
+1. Concise insights about trends or patterns.
+2. Alerts for any unusual or noteworthy activity.
+3. Recommended Home Assistant service calls to execute, if applicable.
 
-Recent raw events (last 6 h):
-{recent_events}
+Here is the complete list of available Home Assistant services you can call. Use only these.
+For each action, include your confidence as a decimal number between 0.0 and 1.0.
+Action Schema:
+{action_schema}
 
-Provide:
-1. Concise insights based on observed trends.
-2. Alerts if anything looks unusual.
-3. Recommended actions.
-
-Respond extremely briefly, suitable for a phone notification.
+Respond in a brief JSON format with "insights", "alerts", and "to_execute" keys.
 """
-DEFAULT_UPDATE_INTERVAL = 1800  # seconds (30 minutes)
+
+
+
+
