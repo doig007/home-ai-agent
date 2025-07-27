@@ -122,7 +122,7 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 domain_ok = entity.domain in selected_domains
                 area_ok = entity.area_id and area_reg.areas.get(entity.area_id, {}).name in selected_areas
                 if domain_ok or area_ok:
-                    selected_entities.append(eid)
+                    selected_entities.add(eid)
 
             # Add entries matching include patterns (supports wildcards) 
             include_patterns_str = user_input.get(CONF_INCLUDE_PATTERNS, "")
@@ -139,7 +139,8 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                     entities_to_remove.update(fnmatch.filter(selected_entities, pattern))
                 selected_entities -= entities_to_remove
 
-            user_input[CONF_ENTITIES] = selected_entities
+            # Store the final sorted list in the user_input to be saved
+            user_input[CONF_ENTITIES] = sorted(list(selected_entities))
             return self.async_create_entry(title="", data=user_input)
 
         # Current/previous values
