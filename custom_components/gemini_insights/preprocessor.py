@@ -11,6 +11,7 @@ from homeassistant.components.recorder.statistics import (
     statistics_during_period,
     StatisticData,
 )
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,14 +81,22 @@ class Preprocessor:
             return "{}"
             
         # Create a payload with only state and last_changed, which is far more compact.
-        payload = {
-            entity_id: [
-                {"s": s.state, "t": s.last_changed.isoformat()}
-                for s in states
-            ]
-            for entity_id, states in history.items()
-            if states
-        }
+        payload = {}
+        for entity_id, states in history.items():
+            if not states:
+                continue
+            
+            # The 'states' variable is a list of dictionaries, not State objects.
+            # We need to access the data using dictionary keys 's' (state) and 'lu' (last_updated timestamp).
+            compact_states = []
+            for s in states:
+                # Convert the 'lu' timestamp back to an ISO formatted datetime string
+                timestamp_iso = dt_util.utc_from_timestamp(s.get('lu', 0)).isoformat()
+                compact_states.append(
+                    {"s": s.get('s'), "t": timestamp_iso}
+                )
+            payload[entity_id] = compact_states
+
         return await self.hass.async_add_executor_job(
             json.dumps, payload, cls=JSONEncoder
         )
