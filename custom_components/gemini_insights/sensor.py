@@ -139,12 +139,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             debug_dir = pathlib.Path(__file__).with_suffix('').parent / "debug_prompts"
             debug_dir.mkdir(exist_ok=True)
             ts = time.strftime("%Y%m%d_%H%M%S")
-            content = (
-                "==========  PROMPT  ==========\n"
-                f"{prompt_template}\n\n"
-                "==========  ENTITY DATA  ==========\n"
-                f"{entity_data_json}"
-            )
+            content = final_prompt
+            
             # non-blocking write
             await hass.async_add_executor_job(
                 functools.partial(
