@@ -8,6 +8,8 @@ CONF_DOMAINS = "domains"
 CONF_AREAS   = "areas"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HISTORY_PERIOD = "history_period"
+CONF_AUTO_EXECUTE_ACTIONS = "auto_execute_actions"
+CONF_ACTION_CONFIDENCE_THRESHOLD = "action_confidence_threshold"
 
 # History period options
 HISTORY_LATEST_ONLY = "latest_only"

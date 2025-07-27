@@ -20,6 +20,8 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     CONF_HISTORY_PERIOD,
     DEFAULT_HISTORY_PERIOD,
+    CONF_AUTO_EXECUTE_ACTIONS,
+    CONF_ACTION_CONFIDENCE_THRESHOLD,    
     HISTORY_LATEST_ONLY,
     HISTORY_1_HOUR,
     HISTORY_6_HOURS,
@@ -195,6 +197,21 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                     HISTORY_3_DAYS,
                     HISTORY_7_DAYS,
                 ]),
+                vol.Optional(
+                    CONF_AUTO_EXECUTE_ACTIONS,
+                    default=self.config_entry.options.get(CONF_AUTO_EXECUTE_ACTIONS, False)
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ACTION_CONFIDENCE_THRESHOLD,
+                    default=self.config_entry.options.get(CONF_ACTION_CONFIDENCE_THRESHOLD, 0.7)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.0,
+                        max=1.0,
+                        step=0.05,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
             }
         )
 

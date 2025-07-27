@@ -25,6 +25,8 @@ from .const import (
     DEFAULT_HISTORY_PERIOD,
     HISTORY_LATEST_ONLY,
     HISTORY_PERIOD_TIMEDELTA_MAP,
+    CONF_AUTO_EXECUTE_ACTIONS,
+    CONF_ACTION_CONFIDENCE_THRESHOLD,
 )
 from .gemini_client import GeminiClient
 
@@ -67,6 +69,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         _LOGGER.debug("Coordinator update called")
         
         entity_ids = options.get(CONF_ENTITIES, config.get(CONF_ENTITIES, []))
+        auto_execute = options.get(CONF_AUTO_EXECUTE_ACTIONS, False)
+        confidence_threshold = options.get(CONF_ACTION_CONFIDENCE_THRESHOLD, 0.7)
         prompt_template = options.get(CONF_PROMPT, config.get(CONF_PROMPT, DEFAULT_PROMPT))
         history_period_key = options.get(CONF_HISTORY_PERIOD, config.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD))
 
@@ -200,20 +204,31 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                 _LOGGER.debug(f"Received insights from Gemini: {insights.get('insights')}")
 
                 # Optionally execute any actions Gemini asked for
-                to_execute = insights.get("to_execute") or []
-                for call in to_execute:
-                    try:
-                        domain  = call.get("domain")
-                        service = call.get("service")
-                        service_data = json.loads(call.get("service_data"))
-                        if not all(isinstance(x, str) for x in (domain, service)):
-                            _LOGGER.warning("Skipping malformed action (missing domain/service): %s", call)
-                            continue
+                if auto_execute:
+                    to_execute = insights.get("to_execute") or []
+                    for call in to_execute:
+                        try:
+                            confidence = float(call.get("confidence", 0))
+                            if confidence < confidence_threshold:
+                                _LOGGER.debug(
+                                    "Skipping action due to low confidence (%s < %s): %s",
+                                    confidence,
+                                    confidence_threshold,
+                                    call,
+                                )
+                                continue
 
-                        await hass.services.async_call(domain, service, service_data, blocking=False) 
-                        _LOGGER.debug("Executed Gemini-requested action: %s", call)
-                    except Exception as e:
-                        _LOGGER.error("Failed to execute action %s - %s", call, e)
+                            domain  = call.get("domain")
+                            service = call.get("service")
+                            service_data = json.loads(call.get("service_data"))
+                            if not all(isinstance(x, str) for x in (domain, service)):
+                                _LOGGER.warning("Skipping malformed action (missing domain/service): %s", call)
+                                continue
+
+                            await hass.services.async_call(domain, service, service_data, blocking=False) 
+                            _LOGGER.debug("Executed Gemini-requested action: %s", call)
+                        except Exception as e:
+                            _LOGGER.error("Failed to execute action %s - %s", call, e)
 
 
                 # Send a notification with the insights
