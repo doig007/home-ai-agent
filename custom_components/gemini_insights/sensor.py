@@ -2,6 +2,7 @@
 import logging
 import json
 from datetime import timedelta, datetime
+import functools
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -92,11 +93,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 start_time_history = now - timedelta(**timedelta_params)
                 
                 # Fetch recent events (now returns compact data)
-                history_states_response = await get_instance(hass).async_add_executor_job(
+                get_history_job = functools.partial(
                     get_significant_states,
-                    hass, start_time_history, None, entity_ids,
-                    include_start_time_state=True, minimal_response=True # Use minimal_response
+                    hass,
+                    start_time_history,
+                    None,
+                    entity_ids,
+                    include_start_time_state=True,
+                    minimal_response=True
                 )
+                history_states_response = await get_instance(hass).async_add_executor_job(get_history_job)
                 recent_events_json = await preprocessor.async_get_compact_recent_events_json(history_states_response)
 
                 # Fetch long-term stats (only for numeric entities)
@@ -140,7 +146,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             debug_dir.mkdir(exist_ok=True)
             ts = time.strftime("%Y%m%d_%H%M%S")
             content = final_prompt
-            
+
             # non-blocking write
             await hass.async_add_executor_job(
                 functools.partial(
