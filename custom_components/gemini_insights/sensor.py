@@ -1,8 +1,10 @@
 """Sensor platform for Gemini Insights."""
 import logging
 import json
-from datetime import timedelta, datetime
+from datetime import timedelta
 import functools
+import pathlib
+import time
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -41,8 +43,8 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the sensor platform."""
-    entry_obj = hass.data[DOMAIN][entry.entry_id]["entry"]
-    api_key = entry_obj.data[CONF_API_KEY]
+
+    api_key = entry.data.get(CONF_API_KEY)
 
     if not api_key:
         _LOGGER.error("Gemini API key not found in configuration.")
@@ -130,7 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             action_schema=action_schema_json
         )
         
-
+        # 3. Check the final prompt size
         prompt_size = len(final_prompt.encode('utf-8'))
         if prompt_size > 30000:
             _LOGGER.warning(
@@ -140,8 +142,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 prompt_size
             )
 
+        # 4. Write the final prompt for debugging
         try:
-            import functools, pathlib, time
             debug_dir = pathlib.Path(__file__).with_suffix('').parent / "debug_prompts"
             debug_dir.mkdir(exist_ok=True)
             ts = time.strftime("%Y%m%d_%H%M%S")
@@ -155,8 +157,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     "utf-8",
                 )
             )
-
-            # Call the simplified Gemini client with the complete prompt
+            
+            # 5. Call the simplified Gemini client with the complete prompt
             insights = await gemini_client.get_insights(final_prompt)
             
             if insights:
