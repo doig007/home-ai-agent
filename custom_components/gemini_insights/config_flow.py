@@ -103,33 +103,49 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
 
         # Build dynamic domain list from registry
         ent_reg = entity_registry.async_get(self.hass)
-        domains = sorted({eid.split(".")[0] for eid in ent_reg.entities})
-
-        # Build area list
         area_reg = area_registry.async_get(self.hass)
-        areas = sorted({area.name for area in area_reg.areas.values()})
+
+        # Pre-filter to get only enabled entities
+        enabled_entities = [
+            entity for entity in ent_reg.entities.values() if entity.disabled_by is None
+        ]
+        enabled_entity_ids = {entity.entity_id for entity in enabled_entities}
+
+        domains = sorted({entity.domain for entity in enabled_entities})
+        areas = sorted({
+            area_reg.areas[entity.area_id].name
+            for entity in enabled_entities
+            if entity.area_id and entity.area_id in area_reg.areas
+        })
+
+
+
+
 
         # Resolve selections → final entity list
         if user_input is not None:
             
-            selected_entities = set()
-
-            # Start with entities from selected domains and areas            
+            selected_entities = set()           
             selected_domains = user_input.get(CONF_DOMAINS, [])
             selected_areas = user_input.get(CONF_AREAS, [])
 
-            for eid, entity in ent_reg.entities.items():
+            for entity in enabled_entities:
                 domain_ok = entity.domain in selected_domains
-                area_ok = entity.area_id and area_reg.areas.get(entity.area_id, {}).name in selected_areas
-                if domain_ok or area_ok:
-                    selected_entities.add(eid)
+                
+                area_name = None
+                if entity.area_id and entity.area_id in area_reg.areas:
+                    area_name = area_reg.areas[entity.area_id].name
+                
+                area_ok = area_name in selected_areas
 
-            # Add entries matching include patterns (supports wildcards) 
+                if domain_ok or area_ok:
+                    selected_entities.add(entity.entity_id)
+            
+            # Add entries matching include patterns (now filters against enabled entities)
             include_patterns_str = user_input.get(CONF_INCLUDE_PATTERNS, "")
             if include_patterns_str:
-                all_entity_ids = ent_reg.entities.keys()
                 for pattern in [p.strip() for p in include_patterns_str.split(',') if p.strip()]:
-                    selected_entities.update(fnmatch.filter(all_entity_ids, pattern))
+                    selected_entities.update(fnmatch.filter(enabled_entity_ids, pattern))
 
             # Remove entities matching exclude patterns (supports wildcards)
             exclude_patterns_str = user_input.get(CONF_EXCLUDE_PATTERNS, "")

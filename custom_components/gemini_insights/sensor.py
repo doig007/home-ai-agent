@@ -2,6 +2,9 @@
 import logging
 import json
 from datetime import timedelta
+import functools
+import pathlib
+import time
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,6 +15,10 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.history import get_significant_states
+from homeassistant.components.recorder.statistics import statistics_during_period
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -29,20 +36,15 @@ from .const import (
     CONF_ACTION_CONFIDENCE_THRESHOLD,
 )
 from .gemini_client import GeminiClient
-
-
-
 from .preprocessor import Preprocessor
-from homeassistant.components.recorder.history import get_significant_states # Import from recorder.history
-from homeassistant.util import dt as dt_util # For timezone aware datetime objects
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the sensor platform."""
-    entry_obj = hass.data[DOMAIN][entry.entry_id]["entry"]
-    api_key = entry_obj.data[CONF_API_KEY]
+
+    api_key = entry.data.get(CONF_API_KEY)
 
     if not api_key:
         _LOGGER.error("Gemini API key not found in configuration.")
@@ -57,8 +59,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         raise ConfigEntryNotReady(f"Failed to initialize Gemini Client: {e}") from e
 
     # === COORDINATOR SETUP ===
-    config  = entry_obj.data
-    options = entry_obj.options
+    config  = entry.data
+    options = entry.options
     update_interval_seconds = options.get(
         CONF_UPDATE_INTERVAL,
         config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
@@ -68,125 +70,89 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         """Fetch data from Home Assistant, send to Gemini, and return insights."""
         _LOGGER.debug("Coordinator update called")
         
-        entity_ids = options.get(CONF_ENTITIES, config.get(CONF_ENTITIES, []))
+        entity_ids = options.get(CONF_ENTITIES, [])
+        prompt_template = options.get(CONF_PROMPT, DEFAULT_PROMPT)
+        history_period_key = options.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD)
         auto_execute = options.get(CONF_AUTO_EXECUTE_ACTIONS, False)
         confidence_threshold = options.get(CONF_ACTION_CONFIDENCE_THRESHOLD, 0.7)
-        prompt_template = options.get(CONF_PROMPT, config.get(CONF_PROMPT, DEFAULT_PROMPT))
-        history_period_key = options.get(CONF_HISTORY_PERIOD, config.get(CONF_HISTORY_PERIOD, DEFAULT_HISTORY_PERIOD))
 
         if not entity_ids:
             _LOGGER.info("No entities configured for Gemini Insights. Skipping API call.")
             return {"insights": "No entities configured.", "alerts": "", "actions": "", "raw_text": "No entities configured."}
 
-        entity_data_map = {}
+        # === START OF REFACTORED DATA FETCHING AND PROCESSING ===
+        preprocessor = Preprocessor(hass, entity_ids)
         now = dt_util.utcnow()
+        entity_data_json = "{}"
 
-        for entity_id in entity_ids:
-            if history_period_key == HISTORY_LATEST_ONLY:
-                state = hass.states.get(entity_id)
-                if state:
-                    entity_data_map[entity_id] = {
-                        "current_state": {
-                            "state": state.state,
-                            "attributes": dict(state.attributes),
-                            "last_changed": state.last_changed.isoformat() if state.last_changed else None,
-                            "last_updated": state.last_updated.isoformat() if state.last_updated else None,
-                        }
-                    }
-                else:
-                    entity_data_map[entity_id] = {"current_state": None}
-                    _LOGGER.warning(f"Entity {entity_id} not found for current state.")
-            else:
-                timedelta_params = HISTORY_PERIOD_TIMEDELTA_MAP.get(history_period_key)
-                if timedelta_params:
-                    start_time = now - timedelta(**timedelta_params)
-                    history_states_response = await hass.async_add_executor_job(
-                        get_significant_states,
-                        hass, start_time, None, [entity_id],
-                        None, True, False
-                    )
-                    
-                    historical_states_data = []
-                    if entity_id in history_states_response and history_states_response[entity_id]:
-                        for s in history_states_response[entity_id]:
-                            historical_states_data.append({
-                                "state": s.state,
-                                "attributes": dict(s.attributes),
-                                "last_changed": s.last_changed.isoformat(),
-                                "last_updated": s.last_updated.isoformat(),
-                            })
-                    entity_data_map[entity_id] = {"historical_states": historical_states_data}
-                    if not historical_states_data:
-                        current_state_val = hass.states.get(entity_id)
-                        if current_state_val:
-                             entity_data_map[entity_id]["current_state"] = {
-                                "state": current_state_val.state,
-                                "attributes": dict(current_state_val.attributes),
-                                "last_changed": current_state_val.last_changed.isoformat(),
-                                "last_updated": current_state_val.last_updated.isoformat(),
-                            }
-                else:
-                    _LOGGER.warning(f"Unknown history period key: {history_period_key}. Falling back to latest.")
-                    state = hass.states.get(entity_id)
-                    if state:
-                         entity_data_map[entity_id] = {
-                            "current_state": { "state": state.state, "attributes": dict(state.attributes) }
-                         }
+        # 1a. Fetch data based on user's history preference
+        if history_period_key == HISTORY_LATEST_ONLY:
+            entity_data_json = await preprocessor.async_get_compact_latest_states_json()
+        else:
+            # Fetch both historical states and long-term stats for other periods
+            timedelta_params = HISTORY_PERIOD_TIMEDELTA_MAP.get(history_period_key)
+            if timedelta_params:
+                start_time_history = now - timedelta(**timedelta_params)
+                
+                # Fetch recent events (now returns compact data)
+                get_history_job = functools.partial(
+                    get_significant_states,
+                    hass,
+                    start_time_history,
+                    None,
+                    entity_ids,
+                    include_start_time_state=True,
+                    minimal_response=True
+                )
+                history_states_response = await get_instance(hass).async_add_executor_job(get_history_job)
+                recent_events_json = await preprocessor.async_get_compact_recent_events_json(history_states_response)
 
-        preprocessor = Preprocessor(hass, entity_ids)
-        entity_data_json = await preprocessor.async_get_entity_data_json()
+                # Fetch long-term stats (only for numeric entities)
+                start_time_stats = now - timedelta(days=1)
+                numeric_entity_ids = [eid for eid in entity_ids if preprocessor._is_numeric_entity(eid)]
+                stats_response = await get_instance(hass).async_add_executor_job(
+                    statistics_during_period,
+                    hass, start_time_stats, None, numeric_entity_ids, "5minute", None, {"mean"}
+                )
+                
+                # Pass the start_time_stats variable to the preprocessor
+                long_term_stats_json = await preprocessor.async_get_compact_long_term_stats_json(
+                    stats_response, start_time_stats
+                )
 
-        # ------------------------------------------------------------------
-        # Build the new prompt
-        # ------------------------------------------------------------------
-        preprocessor = Preprocessor(hass, entity_ids)
-        entity_data_json = await preprocessor.async_get_entity_data_json()
+                # Combine them into a single JSON object string for the prompt
+                combined_payload = {
+                    "recent_events": json.loads(recent_events_json),
+                    "long_term_stats": json.loads(long_term_stats_json)
+                }
+                entity_data_json = json.dumps(combined_payload)
 
-        # New prompt template – can be overriden in options
-        prompt_template = options.get(
-            CONF_PROMPT,
-            """
-Home Assistant data for the family home.
-
-Long-term averages (48 half-hour slots for last day):
-{long_term_stats}
-
-Recent raw events (last 6 h):
-{recent_events}
-
-Provide:
-1. Concise insights based on observed trends.
-2. Alerts if anything looks unusual.
-3. Recommended Home Assistant service calls to execute, including the confidence level (between 0 and 100 percent) for those actions.
-
-Respond extremely briefly, suitable for a phone notification.
-
-Here is the complete list of Home-Assistant service calls you are allowed to use:
-{action_schema}
-
-""",
+        # 1b. Get the action schema from Home Assistant.
+        action_schema_json = await preprocessor.async_get_action_schema()
+        
+        # 2. Build the final prompt
+        final_prompt = prompt_template.format(
+            entity_data=entity_data_json,
+            action_schema=action_schema_json
         )
+        
+        # 3. Check the final prompt size
+        prompt_size = len(final_prompt.encode('utf-8'))
+        if prompt_size > 30000:
+            _LOGGER.warning(
+                "The final prompt for Gemini is very large (%s bytes). "
+                "This may lead to errors or high costs. "
+                "Consider reducing entities or history period.",
+                prompt_size
+            )
 
-        # Get the action schema from Home Assistant and append to the prompt template
-        action_schema = await preprocessor.async_get_action_schema()
-
-        if len(entity_data_json) > 100000:
-            _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
-
-        if len(entity_data_json) > 100000:
-            _LOGGER.warning("The data payload for Gemini is very large (%s bytes).", len(entity_data_json))
-
+        # 4. Write the final prompt for debugging
         try:
-            import functools, pathlib, time
             debug_dir = pathlib.Path(__file__).with_suffix('').parent / "debug_prompts"
             debug_dir.mkdir(exist_ok=True)
             ts = time.strftime("%Y%m%d_%H%M%S")
-            content = (
-                "==========  PROMPT  ==========\n"
-                f"{prompt_template}\n\n"
-                "==========  ENTITY DATA  ==========\n"
-                f"{entity_data_json}"
-            )
+            content = final_prompt
+
             # non-blocking write
             await hass.async_add_executor_job(
                 functools.partial(
@@ -195,10 +161,9 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                     "utf-8",
                 )
             )
-
-            insights = await gemini_client.get_insights(
-                prompt_template, entity_data_json, action_schema
-            )
+            
+            # 5. Call the simplified Gemini client with the complete prompt
+            insights = await gemini_client.get_insights(final_prompt)
             
             if insights:
                 _LOGGER.debug(f"Received insights from Gemini: {insights.get('insights')}")
@@ -241,10 +206,10 @@ Here is the complete list of Home-Assistant service calls you are allowed to use
                 return insights
             else:
                 _LOGGER.error("Failed to get insights from Gemini.")
-                return {"insights": "Error", "alerts": "Error", "to_execute": "Error", "raw_text": "Failed to get insights"}
+                return {"insights": "Error", "alerts": "Error", "to_execute": [], "raw_text": "Failed to get insights"}
         except Exception as e:
             _LOGGER.error(f"Exception during Gemini API call in coordinator: {e}")
-            return {"insights": f"Exception: {e}", "alerts": "Exception", "to_execute": "Exception", "raw_text": f"Exception: {e}"}
+            return {"insights": f"Exception: {e}", "alerts": "Exception", "to_execute": [], "raw_text": f"Exception: {e}"}
 
     coordinator = DataUpdateCoordinator(
         hass,
@@ -310,21 +275,36 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Return the state of the sensor."""
+        """
+        Return a short, concise state that is always under 255 characters.
+        The full text will be moved to the attributes.
+        """
         if self.coordinator.data is None:
             return "Initializing..."
         
-        if isinstance(self.coordinator.data, dict):
-            return self.coordinator.data.get(self._insight_type, "Not available")
+        if not isinstance(self.coordinator.data, dict):
+            _LOGGER.warning(f"Coordinator data is not a dictionary: {type(self.coordinator.data)}")
+            return "Error: Invalid data"
 
-        _LOGGER.warning(f"Coordinator data is not a dictionary: {type(self.coordinator.data)}")
-        return "Error: Invalid data"
+        full_text = self.coordinator.data.get(self._insight_type, "")
+        if not full_text:
+            return "Not available"
+
+        # Return a short state with the character count. This is always < 255 chars.
+        return f"Updated ({len(full_text)} chars)"
 
     @property
     def extra_state_attributes(self):
-        """Return the state attributes."""
-        attrs = {}
-        attrs["last_update_status"] = "Success" if self.coordinator.last_update_success else "Failed"
+        """Return the state attributes, including the full insight text."""
+        attrs = {
+            "last_update_status": "Success" if self.coordinator.last_update_success else "Failed"
+        }
+        
+        if isinstance(self.coordinator.data, dict):
+            # Add the full, long-form text as an attribute.
+            # The key will be 'insights', 'alerts', or 'to_execute'.
+            attrs[self._insight_type] = self.coordinator.data.get(self._insight_type, "Not available")
+
         return attrs
 
     @property
