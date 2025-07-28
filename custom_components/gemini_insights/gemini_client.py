@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 _LOGGER = logging.getLogger(__name__)
 
 MODEL = "gemini-2.5-flash"
+# The SAFETY constant is no longer used in the call, but can be kept for reference.
 SAFETY = {
     "HARASSMENT":          "BLOCK_MEDIUM_AND_ABOVE",
     "HATE_SPEECH":         "BLOCK_MEDIUM_AND_ABOVE",
@@ -79,7 +80,7 @@ class GeminiClient:
                 model=MODEL,
                 contents=[final_prompt],
                 config=GEN_CFG,
-                safety_settings=SAFETY,
+                # safety_settings=SAFETY,  # The safety_settings keyword is not supported by this specific async method.
             )
             # The response.text should already be a JSON string due to response_mime_type
             return json.loads(response.text)
