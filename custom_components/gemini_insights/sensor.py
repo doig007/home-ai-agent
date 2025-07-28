@@ -275,21 +275,36 @@ class GeminiInsightsSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Return the state of the sensor."""
+        """
+        Return a short, concise state that is always under 255 characters.
+        The full text will be moved to the attributes.
+        """
         if self.coordinator.data is None:
             return "Initializing..."
         
-        if isinstance(self.coordinator.data, dict):
-            return self.coordinator.data.get(self._insight_type, "Not available")
+        if not isinstance(self.coordinator.data, dict):
+            _LOGGER.warning(f"Coordinator data is not a dictionary: {type(self.coordinator.data)}")
+            return "Error: Invalid data"
 
-        _LOGGER.warning(f"Coordinator data is not a dictionary: {type(self.coordinator.data)}")
-        return "Error: Invalid data"
+        full_text = self.coordinator.data.get(self._insight_type, "")
+        if not full_text:
+            return "Not available"
+
+        # Return a short state with the character count. This is always < 255 chars.
+        return f"Updated ({len(full_text)} chars)"
 
     @property
     def extra_state_attributes(self):
-        """Return the state attributes."""
-        attrs = {}
-        attrs["last_update_status"] = "Success" if self.coordinator.last_update_success else "Failed"
+        """Return the state attributes, including the full insight text."""
+        attrs = {
+            "last_update_status": "Success" if self.coordinator.last_update_success else "Failed"
+        }
+        
+        if isinstance(self.coordinator.data, dict):
+            # Add the full, long-form text as an attribute.
+            # The key will be 'insights', 'alerts', or 'to_execute'.
+            attrs[self._insight_type] = self.coordinator.data.get(self._insight_type, "Not available")
+
         return attrs
 
     @property
