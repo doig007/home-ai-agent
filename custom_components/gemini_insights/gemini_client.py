@@ -75,7 +75,7 @@ class GeminiClient:
         """Return parsed JSON from Gemini using a fully-formed prompt."""
 
         try:
-            response = await self._client.generate_content_async(
+            response = await self._client.aio.models.generate_content(
                 model=MODEL,
                 contents=[final_prompt],
                 generation_config=GEN_CFG,
