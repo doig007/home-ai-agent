@@ -114,7 +114,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     statistics_during_period,
                     hass, start_time_stats, None, numeric_entity_ids, "5minute", None, {"mean"}
                 )
-                long_term_stats_json = await preprocessor.async_get_compact_long_term_stats_json(stats_response)
+                
+                # Pass the start_time_stats variable to the preprocessor
+                long_term_stats_json = await preprocessor.async_get_compact_long_term_stats_json(
+                    stats_response, start_time_stats
+                )
 
                 # Combine them into a single JSON object string for the prompt
                 combined_payload = {
