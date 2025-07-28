@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from statistics import mean
 from typing import Any, Dict, List, Union
+import functools
 
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers.json import JSONEncoder
@@ -70,9 +71,9 @@ class Preprocessor:
             if entity_payload:
                 compact_payload[entity_id] = entity_payload
 
-        return await self.hass.async_add_executor_job(
-            json.dumps, compact_payload, cls=JSONEncoder
-        )
+        json_job = functools.partial(json.dumps, compact_payload, cls=JSONEncoder)
+        return await self.hass.async_add_executor_job(json_job)
+
 
     async def async_get_compact_recent_events_json(
         self, history: Dict[str, List[State]]
@@ -104,9 +105,9 @@ class Preprocessor:
 
             payload[entity_id] = compact_states
 
-        return await self.hass.async_add_executor_job(
-            json.dumps, payload, cls=JSONEncoder
-        )
+        json_job = functools.partial(json.dumps, payload, cls=JSONEncoder)
+        return await self.hass.async_add_executor_job(json_job)
+
 
     async def async_get_compact_latest_states_json(self) -> str:
         """Return a compact JSON string of the latest states, omitting attributes."""
@@ -123,6 +124,7 @@ class Preprocessor:
             json.dumps, payload, cls=JSONEncoder
         )
     
+
     async def async_get_action_schema(self) -> str:
         """Return a compact JSON list of allowed actions, minus a few dangerous ones."""
         from homeassistant.helpers import service
@@ -149,6 +151,5 @@ class Preprocessor:
                 )
         
         # Serialize in a thread pool to avoid blocking
-        return await self.hass.async_add_executor_job(
-            functools.partial(json.dumps, actions, separators=(",", ":"))
-        )
+        json_job = functools.partial(json.dumps, actions, separators=(",", ":"))
+        return await self.hass.async_add_executor_job(json_job)
