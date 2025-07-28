@@ -1,8 +1,8 @@
-# Gemini Insights for Home Assistant
+# AI Agent for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 
-**Gemini Insights** is a custom component for Home Assistant that leverages the power of Google's Gemini Pro API to analyze data from your Home Assistant entities. It can provide you with:
+**home-ai-agent** is a custom component for Home Assistant that leverages the power of Google's Gemini Pro API to analyse data from your Home Assistant entities. It can provide you with:
 
 1.  **General Insights:** Useful observed trends from your smart home data.
 2.  **Alerts:** Notifications if anything looks out of the ordinary.
