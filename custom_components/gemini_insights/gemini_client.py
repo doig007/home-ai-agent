@@ -78,7 +78,7 @@ class GeminiClient:
             response = await self._client.aio.models.generate_content(
                 model=MODEL,
                 contents=[final_prompt],
-                generation_config=GEN_CFG,
+                config=GEN_CFG,
                 safety_settings=SAFETY,
             )
             # The response.text should already be a JSON string due to response_mime_type
