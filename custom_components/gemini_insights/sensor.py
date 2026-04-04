@@ -23,6 +23,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN,
     CONF_ENTITIES,
+    CONF_MODEL,
     CONF_PROMPT,
     CONF_UPDATE_INTERVAL,
     DEFAULT_PROMPT,
@@ -34,6 +35,7 @@ from .const import (
     HISTORY_PERIOD_TIMEDELTA_MAP,
     CONF_AUTO_EXECUTE_ACTIONS,
     CONF_ACTION_CONFIDENCE_THRESHOLD,
+    DEFAULT_MODEL,
 )
 from .gemini_client import GeminiClient
 from .preprocessor import Preprocessor
@@ -45,6 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     """Set up the sensor platform."""
 
     api_key = entry.data.get(CONF_API_KEY)
+    model = entry.options.get(CONF_MODEL, entry.data.get(CONF_MODEL, DEFAULT_MODEL))
 
     if not api_key:
         _LOGGER.error("Gemini API key not found in configuration.")
@@ -52,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     # === SYNCHRONOUS CLIENT INITIALIZATION ===
     try:
-        gemini_client = await GeminiClient.async_create(hass, api_key)
+        gemini_client = await GeminiClient.async_create(hass, api_key, model)
     except Exception as e:
         _LOGGER.error(f"Failed to initialize Gemini Client: {e}")
         # Raising ConfigEntryNotReady will cause Home Assistant to retry the setup later.

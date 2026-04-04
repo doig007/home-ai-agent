@@ -6,7 +6,21 @@ from homeassistant import config_entries, data_entry_flow
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_API_KEY
 
-from custom_components.gemini_insights.const import DOMAIN, CONF_ENTITIES, CONF_PROMPT, CONF_UPDATE_INTERVAL
+from custom_components.gemini_insights.const import (
+    DOMAIN,
+    CONF_ENTITIES,
+    CONF_HISTORY_PERIOD,
+    CONF_DOMAINS,
+    CONF_AREAS,
+    CONF_INCLUDE_PATTERNS,
+    CONF_EXCLUDE_PATTERNS,
+    CONF_AUTO_EXECUTE_ACTIONS,
+    CONF_ACTION_CONFIDENCE_THRESHOLD,
+    CONF_MODEL,
+    CONF_PROMPT,
+    CONF_UPDATE_INTERVAL,
+    DEFAULT_MODEL,
+)
 # Assuming your GeminiClient is in .gemini_client
 # If you had a way to mock a successful API key test, you'd use it here.
 # For now, we'll assume providing any key is "valid" for flow purposes,
@@ -89,11 +103,16 @@ async def test_options_flow(hass: HomeAssistant) -> None:
 
     # Simulate user input for options
     new_options = {
-        CONF_ENTITIES: ["sensor.temperature", "light.living_room"],
+        CONF_MODEL: DEFAULT_MODEL,
         CONF_PROMPT: "New custom prompt",
         CONF_UPDATE_INTERVAL: 300,
-        CONF_HISTORY_PERIOD: "24_hours", # Example history period
-
+        CONF_DOMAINS: [],
+        CONF_AREAS: [],
+        CONF_INCLUDE_PATTERNS: "",
+        CONF_EXCLUDE_PATTERNS: "",
+        CONF_HISTORY_PERIOD: "24_hours",
+        CONF_AUTO_EXECUTE_ACTIONS: False,
+        CONF_ACTION_CONFIDENCE_THRESHOLD: 0.7,
     }
     result2 = await hass.config_entries.options.async_configure(
         result["flow_id"], user_input=new_options
@@ -101,6 +120,7 @@ async def test_options_flow(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
 
     assert result2["type"] == data_entry_flow.RESULT_TYPE_CREATE_ENTRY
+    assert new_options[CONF_ENTITIES] == []
     assert config_entry.options == new_options
 
 
