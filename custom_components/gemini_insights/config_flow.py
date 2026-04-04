@@ -79,6 +79,9 @@ class GeminiInsightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_API_KEY): str,
+                    vol.Required(CONF_MODEL, default=DEFAULT_MODEL): selector.TextSelector(
+                        selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+                    ),
                     # Optional fields during initial setup, can be configured in options
                     # vol.Optional(CONF_ENTITIES, default=[]): selector.EntitySelector(
                     #     selector.EntitySelectorConfig(multiple=True),

@@ -49,6 +49,7 @@ async def test_form_user_success(hass: HomeAssistant) -> None:
             result["flow_id"],
             {
                 CONF_API_KEY: VALID_API_KEY,
+                CONF_MODEL: DEFAULT_MODEL,
             },
         )
         await hass.async_block_till_done()
@@ -57,6 +58,7 @@ async def test_form_user_success(hass: HomeAssistant) -> None:
     assert result2["title"] == "Gemini Insights"
     assert result2["data"] == {
         CONF_API_KEY: VALID_API_KEY,
+        CONF_MODEL: DEFAULT_MODEL,
     }
     assert len(mock_setup_entry.mock_calls) == 1
 
@@ -73,6 +75,7 @@ async def test_form_user_missing_api_key(hass: HomeAssistant) -> None:
         result["flow_id"],
         {
             CONF_API_KEY: "", # Empty API Key
+            CONF_MODEL: DEFAULT_MODEL,
         },
     )
     await hass.async_block_till_done()
@@ -137,7 +140,7 @@ async def test_form_user_already_configured(hass: HomeAssistant) -> None:
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     await hass.config_entries.flow.async_configure(
-        initial_result["flow_id"], {CONF_API_KEY: VALID_API_KEY}
+        initial_result["flow_id"], {CONF_API_KEY: VALID_API_KEY, CONF_MODEL: DEFAULT_MODEL}
     )
     await hass.async_block_till_done()
 
@@ -158,6 +161,7 @@ async def test_form_user_already_configured(hass: HomeAssistant) -> None:
         result["flow_id"],
         {
             CONF_API_KEY: VALID_API_KEY,
+            CONF_MODEL: DEFAULT_MODEL,
         },
     )
     await hass.async_block_till_done()
