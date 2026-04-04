@@ -84,8 +84,8 @@ class GeminiClient:
             response = await self._client.generate_content_async(
                 model=self._model,
                 contents=[final_prompt],
-                generation_config=GEN_CFG,
-                safety_settings=SAFETY,
+                config=GEN_CFG,
+                # safety_settings=SAFETY,  # The safety_settings keyword is not supported by this specific async method.
             )
             # The response.text should already be a JSON string due to response_mime_type
             return json.loads(response.text)

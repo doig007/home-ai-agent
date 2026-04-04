@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from statistics import mean
 from typing import Any, Dict, List, Union
 import functools
@@ -37,7 +37,7 @@ class Preprocessor:
             return False
 
     async def async_get_compact_long_term_stats_json(
-        self, stats: Dict[str, List[StatisticData]]
+        self, stats: Dict[str, List[Dict[str, Any]]], start_time: datetime
     ) -> str:
         """Return a compact JSON string of 48 half-hour slots with per-entity averages."""
         if not stats:
@@ -48,15 +48,17 @@ class Preprocessor:
             eid: {i: [] for i in range(48)} for eid in self.entity_ids
         }
         
-        start_of_day = list(stats.values())[0][0]["start"].replace(hour=0, minute=0, second=0, microsecond=0)
-
         for entity_id, stat_list in stats.items():
             if not self._is_numeric_entity(entity_id):
                 continue  # Skip non-numeric entities entirely
 
             for row in stat_list:
-                # Calculate slot index from the start of the 24h period
-                slot = int((row["start"] - start_of_day).total_seconds() // 1800)
+                # Convert the row's float timestamp into a datetime object
+                ts = dt_util.utc_from_timestamp(row["start"])
+                
+                # Calculate the slot index relative to the start_time we received
+                slot = int((ts - start_time).total_seconds() // 1800)
+                
                 if 0 <= slot < 48 and row.get("mean") is not None:
                     entity_stats[entity_id][slot].append(row["mean"])
 
