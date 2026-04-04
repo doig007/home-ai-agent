@@ -8,9 +8,10 @@ from google.genai import types as t
 
 from homeassistant.core import HomeAssistant
 
+from .const import DEFAULT_MODEL
+
 _LOGGER = logging.getLogger(__name__)
 
-MODEL = "gemini-2.5-flash"
 SAFETY = {
     "HARASSMENT":          "BLOCK_MEDIUM_AND_ABOVE",
     "HATE_SPEECH":         "BLOCK_MEDIUM_AND_ABOVE",
@@ -49,24 +50,29 @@ GEN_CFG = t.GenerateContentConfig(
 class GeminiClient:
     """Thin async wrapper around google-genai client."""
 
-    def __init__(self, client: genai.Client):
+    def __init__(self, client: genai.Client, model: str):
         self._client = client
+        self._model = model
 
     @classmethod
     async def async_create(
-        cls, hass: HomeAssistant, api_key: str
+        cls, hass: HomeAssistant, api_key: str, model: str = DEFAULT_MODEL
     ) -> "GeminiClient":
         """Build and return the wrapped client."""
         if not api_key:
             raise ValueError("API key missing")
 
+        selected_model = (model or DEFAULT_MODEL).strip()
+        if not selected_model:
+            raise ValueError("Model missing")
+
         try:
-            client = await hass.async_add_executor_job(_build_client, api_key)
+            client = await hass.async_add_executor_job(_build_client, api_key, selected_model)
         except Exception as exc:
             _LOGGER.error("Gemini key test failed: %s", exc)
             raise ValueError("Invalid or unauthorized Gemini API key") from exc
 
-        return cls(client)
+        return cls(client, selected_model)
 
     async def get_insights(
         self,
@@ -76,7 +82,7 @@ class GeminiClient:
 
         try:
             response = await self._client.generate_content_async(
-                model=MODEL,
+                model=self._model,
                 contents=[final_prompt],
                 generation_config=GEN_CFG,
                 safety_settings=SAFETY,
@@ -88,7 +94,7 @@ class GeminiClient:
             return None
 
 
-def _build_client(api_key: str):
+def _build_client(api_key: str, model: str):
     """Blocking helper: create client and do a tiny call."""
     import google.genai as genai
     from google.genai import types as t
@@ -100,7 +106,7 @@ def _build_client(api_key: str):
     )
     # quick smoke test
     client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=model,
         contents=["ping"],
         config=t.GenerateContentConfig(max_output_tokens=1),
     )

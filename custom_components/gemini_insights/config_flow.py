@@ -1,7 +1,6 @@
 """Config flow for Gemini Insights."""
 import logging
 import fnmatch
-from typing import Any, Dict, List
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -11,6 +10,7 @@ from homeassistant.helpers import selector, entity_registry, area_registry
 
 from .const import (
     DOMAIN,
+    CONF_MODEL,
     CONF_PROMPT,
     CONF_ENTITIES,
     CONF_UPDATE_INTERVAL,
@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_HISTORY_PERIOD,
     CONF_AUTO_EXECUTE_ACTIONS,
     CONF_ACTION_CONFIDENCE_THRESHOLD,    
+    DEFAULT_MODEL,
     HISTORY_LATEST_ONLY,
     HISTORY_1_HOUR,
     HISTORY_6_HOURS,
@@ -191,6 +192,15 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_EXCLUDE_PATTERNS,
                     default=current_config.get(CONF_EXCLUDE_PATTERNS, "")
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+                ),
+                vol.Required(
+                    CONF_MODEL,
+                    default=self.config_entry.options.get(
+                        CONF_MODEL,
+                        self.config_entry.data.get(CONF_MODEL, DEFAULT_MODEL)
+                    ),
                 ): selector.TextSelector(
                     selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
                 ),

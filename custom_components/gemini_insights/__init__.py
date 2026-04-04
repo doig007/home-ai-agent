@@ -1,5 +1,4 @@
 """The Gemini Insights integration."""
-import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -7,10 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_API_KEY
 from homeassistant.exceptions import ConfigEntryNotReady
 
-from google import genai
-from google.genai import types as t
-
-from .const import DOMAIN
+from .const import CONF_MODEL, DEFAULT_MODEL, DOMAIN
 
 from .gemini_client import GeminiClient
 
@@ -22,15 +18,16 @@ PLATFORMS = ["sensor"]  # Example: if you're creating sensor entities
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Gemini Insights from a config entry."""
-    # Store the client in hass.data so platforms can share it
-    api_key = entry.data[CONF_API_KEY]
-
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {"entry": entry}    # store the entry object itself
 
     # validate the key early
     try:
-        await GeminiClient.async_create(hass, entry.data[CONF_API_KEY])
+        await GeminiClient.async_create(
+            hass,
+            entry.data[CONF_API_KEY],
+            entry.options.get(CONF_MODEL, entry.data.get(CONF_MODEL, DEFAULT_MODEL)),
+        )
     except Exception as exc:
         raise ConfigEntryNotReady(str(exc)) from exc
 

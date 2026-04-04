@@ -2,6 +2,7 @@
 
 DOMAIN = "gemini_insights"
 CONF_API_KEY = "api_key"
+CONF_MODEL = "model"
 CONF_PROMPT = "prompt"
 CONF_ENTITIES = "entities"
 CONF_DOMAINS = "domains"
@@ -12,6 +13,8 @@ CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HISTORY_PERIOD = "history_period"
 CONF_AUTO_EXECUTE_ACTIONS = "auto_execute_actions"
 CONF_ACTION_CONFIDENCE_THRESHOLD = "action_confidence_threshold"
+
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 # History period options
 HISTORY_LATEST_ONLY = "latest_only"
