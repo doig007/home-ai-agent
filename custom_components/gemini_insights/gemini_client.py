@@ -50,9 +50,11 @@ GEN_CFG = t.GenerateContentConfig(
 class GeminiClient:
     """Thin async wrapper around google-genai client."""
 
-    def __init__(self, client: genai.Client, model: str):
+    def __init__(self, hass: HomeAssistant, client: genai.Client, model: str):
+        self._hass = hass
         self._client = client
         self._model = model
+        self._aio_models = getattr(getattr(client, "aio", None), "models", None)
 
     @classmethod
     async def async_create(
@@ -72,7 +74,7 @@ class GeminiClient:
             _LOGGER.error("Gemini key test failed: %s", exc)
             raise ValueError("Invalid or unauthorized Gemini API key") from exc
 
-        return cls(client, selected_model)
+        return cls(hass, client, selected_model)
 
     async def get_insights(
         self,
@@ -81,17 +83,28 @@ class GeminiClient:
         """Return parsed JSON from Gemini using a fully-formed prompt."""
 
         try:
-            response = await self._client.generate_content_async(
-                model=self._model,
-                contents=[final_prompt],
-                config=GEN_CFG,
-                # safety_settings=SAFETY,  # The safety_settings keyword is not supported by this specific async method.
-            )
+            response = await self._async_generate_content(final_prompt)
             # The response.text should already be a JSON string due to response_mime_type
             return json.loads(response.text)
         except Exception:
             _LOGGER.exception("Gemini API call failed")
             return None
+
+    async def _async_generate_content(self, final_prompt: str):
+        """Generate content using the SDK's async API when available."""
+        if self._aio_models is not None:
+            return await self._aio_models.generate_content(
+                model=self._model,
+                contents=[final_prompt],
+                config=GEN_CFG,
+            )
+
+        return await self._hass.async_add_executor_job(
+            _generate_content_sync,
+            self._client,
+            self._model,
+            final_prompt,
+        )
 
 
 def _build_client(api_key: str, model: str):
@@ -111,3 +124,12 @@ def _build_client(api_key: str, model: str):
         config=t.GenerateContentConfig(max_output_tokens=1),
     )
     return client
+
+
+def _generate_content_sync(client: genai.Client, model: str, final_prompt: str):
+    """Executor-safe sync fallback for SDK builds without aio support."""
+    return client.models.generate_content(
+        model=model,
+        contents=[final_prompt],
+        config=GEN_CFG,
+    )
