@@ -11,13 +11,23 @@ from homeassistant.helpers import entity_registry, selector
 from .const import (
     CONF_ACTION_CONFIDENCE_THRESHOLD,
     CONF_AUTO_EXECUTE_ACTIONS,
+    CONF_ENABLE_CONFIRMATION_NOTIFICATIONS,
+    CONF_ENABLE_LEARNING,
     CONF_ENTITIES,
+    CONF_FORECAST_HOURS,
     CONF_HISTORY_PERIOD,
+    CONF_MAX_CONFIRMATION_REQUESTS,
     CONF_MODEL,
+    CONF_NOTIFICATION_SERVICE,
     CONF_PROMPT,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_ENABLE_CONFIRMATION_NOTIFICATIONS,
+    DEFAULT_ENABLE_LEARNING,
+    DEFAULT_FORECAST_HOURS,
+    DEFAULT_MAX_CONFIRMATION_REQUESTS,
     DEFAULT_HISTORY_PERIOD,
     DEFAULT_MODEL,
+    DEFAULT_NOTIFICATION_SERVICE,
     DEFAULT_PROMPT,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
@@ -158,6 +168,57 @@ class GeminiInsightsOptionsFlowHandler(config_entries.OptionsFlow):
                         max=1.0,
                         step=0.05,
                         mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+                vol.Required(
+                    CONF_ENABLE_LEARNING,
+                    default=self.config_entry.options.get(
+                        CONF_ENABLE_LEARNING,
+                        DEFAULT_ENABLE_LEARNING,
+                    ),
+                ): selector.BooleanSelector(),
+                vol.Required(
+                    CONF_FORECAST_HOURS,
+                    default=self.config_entry.options.get(
+                        CONF_FORECAST_HOURS,
+                        DEFAULT_FORECAST_HOURS,
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    CONF_ENABLE_CONFIRMATION_NOTIFICATIONS,
+                    default=self.config_entry.options.get(
+                        CONF_ENABLE_CONFIRMATION_NOTIFICATIONS,
+                        DEFAULT_ENABLE_CONFIRMATION_NOTIFICATIONS,
+                    ),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_NOTIFICATION_SERVICE,
+                    default=self.config_entry.options.get(
+                        CONF_NOTIFICATION_SERVICE,
+                        DEFAULT_NOTIFICATION_SERVICE,
+                    ),
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+                ),
+                vol.Required(
+                    CONF_MAX_CONFIRMATION_REQUESTS,
+                    default=self.config_entry.options.get(
+                        CONF_MAX_CONFIRMATION_REQUESTS,
+                        DEFAULT_MAX_CONFIRMATION_REQUESTS,
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=3,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
                     )
                 ),
             }

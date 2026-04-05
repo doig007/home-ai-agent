@@ -28,6 +28,7 @@ GEN_CFG = t.GenerateContentConfig(
         "properties": {
             "insights": {"type": "string"},
             "alerts":   {"type": "string"},
+            "forecast": {"type": "string"},
             "to_execute": {
                 "type": "array",
                 "items": {
@@ -41,8 +42,49 @@ GEN_CFG = t.GenerateContentConfig(
                     "required": ["domain", "service", "service_data","confidence"],
                 },
             },
+            "learning_updates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {"type": "string"},
+                        "status": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "evidence": {"type": "string"},
+                        "entities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["pattern", "status", "confidence", "evidence"],
+                },
+            },
+            "confirmation_requests": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string"},
+                        "pattern": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "entities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["question", "pattern", "reason", "confidence"],
+                },
+            },
         },
-        "required": ["insights", "alerts"],
+        "required": [
+            "insights",
+            "alerts",
+            "forecast",
+            "to_execute",
+            "learning_updates",
+            "confirmation_requests",
+        ],
     },
 )
 
@@ -84,8 +126,13 @@ class GeminiClient:
 
         try:
             response = await self._async_generate_content(final_prompt)
-            # The response.text should already be a JSON string due to response_mime_type
-            return json.loads(response.text)
+            payload = json.loads(response.text)
+            payload.setdefault("forecast", "")
+            payload.setdefault("to_execute", [])
+            payload.setdefault("learning_updates", [])
+            payload.setdefault("confirmation_requests", [])
+            payload["raw_text"] = response.text
+            return payload
         except Exception:
             _LOGGER.exception("Gemini API call failed")
             return None

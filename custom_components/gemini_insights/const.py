@@ -13,8 +13,23 @@ CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HISTORY_PERIOD = "history_period"
 CONF_AUTO_EXECUTE_ACTIONS = "auto_execute_actions"
 CONF_ACTION_CONFIDENCE_THRESHOLD = "action_confidence_threshold"
+CONF_ENABLE_LEARNING = "enable_learning"
+CONF_ENABLE_CONFIRMATION_NOTIFICATIONS = "enable_confirmation_notifications"
+CONF_NOTIFICATION_SERVICE = "notification_service"
+CONF_FORECAST_HOURS = "forecast_hours"
+CONF_MAX_CONFIRMATION_REQUESTS = "max_confirmation_requests"
 
 DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_ENABLE_LEARNING = True
+DEFAULT_ENABLE_CONFIRMATION_NOTIFICATIONS = False
+DEFAULT_NOTIFICATION_SERVICE = ""
+DEFAULT_FORECAST_HOURS = 12
+DEFAULT_MAX_CONFIRMATION_REQUESTS = 1
+
+MOBILE_APP_NOTIFICATION_ACTION_EVENT = "mobile_app_notification_action"
+SERVICE_RECORD_CONFIRMATION = "record_confirmation"
+CONFIRMATION_CONFIRMED = "confirmed"
+CONFIRMATION_REJECTED = "rejected"
 
 # History period options
 HISTORY_LATEST_ONLY = "latest_only"
@@ -41,21 +56,46 @@ HISTORY_PERIOD_TIMEDELTA_MAP = {
 DEFAULT_UPDATE_INTERVAL = 1800  # seconds (30 minutes)
 
 DEFAULT_PROMPT = """
-Analyze the following Home Assistant data, which is provided as a JSON object.
-Data:
+You are analyzing Home Assistant data to learn how this household uses the home.
+Only make claims that are grounded in the entity states. When you are uncertain, say so explicitly.
+
+Home Assistant data:
 {entity_data}
 
-Based on the data, provide:
-1. Concise insights about trends or patterns.
-2. Alerts for any unusual or noteworthy activity.
-3. Recommended Home Assistant service calls to execute, if applicable.
+Entity context:
+{entity_context}
+
+Behavior summary:
+{behavior_summary}
+
+Persisted household learning:
+{household_learning}
+
+Recent confirmation outcomes:
+{confirmation_history}
+
+Forecast horizon in hours:
+{forecast_hours}
+
+Based on the data:
+1. Explain the most likely household routines or occupancy-related patterns that show up in the entity states.
+2. Provide a practical forecast for the next {forecast_hours} hours.
+3. Raise alerts only for genuinely unusual or noteworthy activity.
+4. Recommend Home Assistant service calls only when they are safe and clearly justified.
+5. Propose up to 2 confirmation questions only when a short Home Assistant notification could materially improve future forecasts.
 
 Here is the complete list of available Home Assistant services you can call. Use only these.
 For each action, include your confidence as a decimal number between 0.0 and 1.0.
 Action Schema:
 {action_schema}
 
-Respond in a brief JSON format with "insights", "alerts", and "to_execute" keys.
+Return JSON with these keys:
+- insights: brief household insight grounded in the data
+- alerts: brief alert summary
+- forecast: short forecast for the next {forecast_hours} hours
+- to_execute: array of Home Assistant service calls
+- learning_updates: array of learned patterns with pattern, status, confidence, evidence, and entities
+- confirmation_requests: array of low-friction confirmation questions with question, pattern, reason, confidence, and entities
 """
 
 
