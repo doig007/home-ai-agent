@@ -452,6 +452,11 @@ class GeminiRawTextSensor(CoordinatorEntity, SensorEntity):
             )
             return "Error: Invalid data"
 
+        error_message = self.coordinator.data.get("error_message")
+        if error_message:
+            error_type = str(self.coordinator.data.get("error_type", "Gemini Error"))
+            return error_type.replace("_", " ").title()[:255]
+
         value = self.coordinator.data.get(self._insight_type)
         if value in (None, "", []):
             return "Not available"
@@ -479,6 +484,8 @@ class GeminiRawTextSensor(CoordinatorEntity, SensorEntity):
                 self._insight_type,
                 "Not available",
             )
+            attrs["error_type"] = self.coordinator.data.get("error_type")
+            attrs["error_message"] = self.coordinator.data.get("error_message")
             attrs["learning_profile"] = self.coordinator.data.get("learning_profile")
             attrs["pending_confirmations"] = self.coordinator.data.get(
                 "pending_confirmations",

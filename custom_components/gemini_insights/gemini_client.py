@@ -1,8 +1,10 @@
 """Client for interacting with the Google Gemini API (google-genai SDK)."""
+import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
+from aiohttp import ClientConnectionError, ClientConnectorError, ClientError
 from google import genai
 from google.genai import types as t
 
@@ -113,7 +115,12 @@ class GeminiClient:
         try:
             client = await hass.async_add_executor_job(_build_client, api_key, selected_model)
         except Exception as exc:
-            _LOGGER.error("Gemini key test failed: %s", exc)
+            error_type, error_message = _classify_exception(exc)
+            if error_type in {"network_unreachable", "dns_error", "timeout"}:
+                _LOGGER.warning("Gemini connectivity test failed: %s", error_message)
+                raise ConnectionError(error_message) from exc
+
+            _LOGGER.error("Gemini key test failed: %s", error_message)
             raise ValueError("Invalid or unauthorized Gemini API key") from exc
 
         return cls(hass, client, selected_model)
@@ -133,9 +140,13 @@ class GeminiClient:
             payload.setdefault("confirmation_requests", [])
             payload["raw_text"] = response.text
             return payload
-        except Exception:
-            _LOGGER.exception("Gemini API call failed")
-            return None
+        except Exception as exc:
+            error_type, error_message = _classify_exception(exc)
+            if error_type in {"network_unreachable", "dns_error", "timeout"}:
+                _LOGGER.warning("Gemini API call failed: %s", error_message)
+            else:
+                _LOGGER.exception("Gemini API call failed")
+            return _build_error_payload(error_type, error_message)
 
     async def _async_generate_content(self, final_prompt: str):
         """Generate content using the SDK's async API when available."""
@@ -180,3 +191,88 @@ def _generate_content_sync(client: genai.Client, model: str, final_prompt: str):
         contents=[final_prompt],
         config=GEN_CFG,
     )
+
+
+def _iter_exception_chain(exc: BaseException) -> Iterable[BaseException]:
+    """Yield an exception and its chained causes/contexts."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        yield current
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+
+
+def _classify_exception(exc: BaseException) -> tuple[str, str]:
+    """Classify Gemini client failures into a small set of user-meaningful errors."""
+    chain = list(_iter_exception_chain(exc))
+    combined = " | ".join(str(item) for item in chain if str(item)).lower()
+
+    if "network unreachable" in combined or any(
+        isinstance(item, (ClientConnectorError, ClientConnectionError, OSError))
+        and "network unreachable" in str(item).lower()
+        for item in chain
+    ):
+        return (
+            "network_unreachable",
+            "Network unreachable: Home Assistant could not reach generativelanguage.googleapis.com:443. "
+            "Check internet access, container networking, firewall rules, and IPv4/IPv6 routing.",
+        )
+
+    if any(isinstance(item, asyncio.TimeoutError) for item in chain) or "timed out" in combined:
+        return (
+            "timeout",
+            "Connection to the Gemini API timed out. Check Home Assistant outbound connectivity "
+            "and try again.",
+        )
+
+    if any(isinstance(item, (ClientConnectorError, ClientConnectionError, ClientError)) for item in chain):
+        if any(
+            marker in combined
+            for marker in (
+                "temporary failure in name resolution",
+                "name or service not known",
+                "nodename nor servname",
+                "no address associated",
+            )
+        ):
+            return (
+                "dns_error",
+                "DNS lookup failed for generativelanguage.googleapis.com. Check your Home Assistant "
+                "DNS configuration and outbound network access.",
+            )
+        return (
+            "connection_error",
+            "Home Assistant could not connect to the Gemini API. Check outbound network access "
+            "and any proxy or firewall rules.",
+        )
+
+    if any(marker in combined for marker in ("401", "403", "unauthorized", "permission denied")):
+        return (
+            "auth_error",
+            "Gemini rejected the request. Check that the API key is valid and allowed to use the selected model.",
+        )
+
+    if "json" in combined and "decode" in combined:
+        return (
+            "invalid_response",
+            "Gemini returned a response the integration could not parse as JSON.",
+        )
+
+    message = next((str(item) for item in chain if str(item)), exc.__class__.__name__)
+    return ("unknown_error", f"Gemini request failed: {message}")
+
+
+def _build_error_payload(error_type: str, error_message: str) -> Dict[str, Any]:
+    """Build a structured error payload instead of returning None."""
+    return {
+        "insights": error_message,
+        "alerts": "Gemini request failed.",
+        "forecast": "",
+        "to_execute": [],
+        "learning_updates": [],
+        "confirmation_requests": [],
+        "error_type": error_type,
+        "error_message": error_message,
+        "raw_text": error_message,
+    }
